@@ -1,6 +1,7 @@
 package cloud.aeranghae.main.controller;
 
 import cloud.aeranghae.main.config.auth.JwtTokenProvider; // 추가됨!
+import cloud.aeranghae.main.domain.Role;
 import cloud.aeranghae.main.domain.User;
 import cloud.aeranghae.main.config.auth.dto.GoogleLoginRequest;
 import cloud.aeranghae.main.service.GoogleAuthService;
@@ -18,26 +19,26 @@ import java.util.Map;
 public class AuthController {
 
     private final GoogleAuthService googleAuthService;
-    private final JwtTokenProvider jwtTokenProvider; // 추가됨!
+    private final JwtTokenProvider jwtTokenProvider;
 
     @PostMapping("/google")
     public ResponseEntity<?> googleLogin(@RequestBody GoogleLoginRequest request) {
         try {
-            // 1. 구글 토큰 검증 및 유저 DB 저장/업데이트
             User user = googleAuthService.verifyTokenAndLogin(request.getCredential());
-
-            // 2. 우리 서버만의 JWT 토큰 생성!
             String accessToken = jwtTokenProvider.createToken(user.getEmail(), user.getRole().name());
 
-            // 3. 리액트가 쓰기 편하게 JSON(Map) 형태로 묶어서 반환
             Map<String, Object> response = new HashMap<>();
             response.put("accessToken", accessToken);
             response.put("name", user.getName());
             response.put("email", user.getEmail());
             response.put("picture", user.getPicture());
+            response.put("role", user.getRole());
+
+            // Role이 GUEST면 아직 가입 절차(닉네임 설정)가 안 끝난 신규 유저입니다.
+            boolean isNewUser = (user.getRole() == Role.GUEST);
+            response.put("isNewUser", isNewUser);
 
             return ResponseEntity.ok(response);
-
         } catch (Exception e) {
             return ResponseEntity.status(401).body("로그인 실패: " + e.getMessage());
         }
