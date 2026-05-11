@@ -28,4 +28,18 @@ public class StorageService {
             throw new RuntimeException("유저 디렉토리 생성 실패: " + userIdentifier, e);
         }
     }
+
+    public long getUserStorageUsage(String userIdentifier) {
+        Path path = Paths.get(baseStoragePath, userIdentifier);
+
+        if (Files.notExists(path)) return 0L;
+
+        try (var paths = Files.walk(path)) {
+            return paths.filter(Files::isRegularFile)
+                    .mapToLong(p -> p.toFile().length())
+                    .sum(); // 바이트(Byte) 단위 합계
+        } catch (IOException e) {
+            throw new RuntimeException("용량 계산 중 오류 발생", e);
+        }
+    }
 }
