@@ -75,31 +75,31 @@ jobs:
             # 6-3. 불필요한 파일 정리 (에러 무시 처리)
             rm -f $APP_PATH/*-plain.jar 2>/dev/null || true
 
-#            # 6-4. 새로운 버전 실행
-#            echo "새로운 버전 실행 시도..."
-#            # 최신 파일을 찾음
-#            NEW_JAR=$(ls -t $APP_PATH/main-api-*.jar 2>/dev/null | head -n 1)
-#
-#            if [ -z "$NEW_JAR" ]; then
-#              echo "실행할 JAR 파일을 찾을 수 없습니다. 경로: $APP_PATH"
-#              ls -al $APP_PATH
-#              exit 1
-#            fi
-#
-#            echo "실행 파일: $NEW_JAR"
-#            nohup java -jar "$NEW_JAR" \
-#              --spring.config.location=file:$APP_PATH/application.yml,file:$APP_PATH/application-oauth.yml \
-#              > $APP_PATH/app.log 2>&1 &
-#
-#            # 6-5. 대기 및 결과 확인
-#            echo "스프링 부트 초기화 대기 중 (15초)..."
-#            sleep 15
-#
-#            if pgrep -f 'main-api' > /dev/null; then
-#              echo "--- [성공] 서버 실행 완료! ---"
-#              ps -ef | grep 'main-api' | grep -v grep
-#            else
-#              echo "--- [실패] 서버 실행 실패. 로그 확인이 필요합니다. ---"
-#              tail -n 30 $APP_PATH/app.log
-#              exit 1
-#            fi
+            # 6-4. 새로운 버전 실행
+            echo "새로운 버전 실행 시도..."
+            # 최신 파일을 찾음
+            NEW_JAR=$(ls -t $APP_PATH/main-api-*.jar 2>/dev/null | head -n 1)
+
+            if [ -z "$NEW_JAR" ]; then
+              echo "실행할 JAR 파일을 찾을 수 없습니다. 경로: $APP_PATH"
+              ls -al $APP_PATH
+              exit 1
+            fi
+
+            echo "실행 파일: $NEW_JAR"
+            nohup java -jar "$NEW_JAR" \
+              --spring.config.location=file:$APP_PATH/application.yml,file:$APP_PATH/application-oauth.yml \
+              > $APP_PATH/app.log 2>&1 &
+
+            # 6-5. 대기 및 결과 확인
+            echo "스프링 부트 초기화 대기 중 (15초)..."
+            sleep 15
+
+            if pgrep -f 'main-api' > /dev/null; then
+              echo "--- [성공] 서버 실행 완료! ---"
+              ps -ef | grep 'main-api' | grep -v grep
+            else
+              echo "--- [실패] 서버 실행 실패. 로그 확인이 필요합니다. ---"
+              tail -n 30 $APP_PATH/app.log
+              exit 1
+            fi
