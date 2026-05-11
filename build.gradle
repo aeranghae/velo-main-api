@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'cloud.aeranghae'
-version = '0.0.2-SNAPSHOT'
+version = '0.0.3-SNAPSHOT'
 description = 'aeranghae-main'
 
 java {
