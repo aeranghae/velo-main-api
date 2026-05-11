@@ -5,6 +5,7 @@ import cloud.aeranghae.main.domain.Role;
 import cloud.aeranghae.main.domain.User;
 import cloud.aeranghae.main.config.auth.dto.GoogleLoginRequest;
 import cloud.aeranghae.main.service.GoogleAuthService;
+import cloud.aeranghae.main.service.StorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,11 +21,20 @@ public class AuthController {
 
     private final GoogleAuthService googleAuthService;
     private final JwtTokenProvider jwtTokenProvider;
+    private final StorageService storageService;
 
     @PostMapping("/google")
     public ResponseEntity<?> googleLogin(@RequestBody GoogleLoginRequest request) {
         try {
             User user = googleAuthService.verifyTokenAndLogin(request.getCredential());
+
+            // 로그인할 때마다 디렉토리 존재 여부 체크 및 생성
+            // 이미 폴더가 있으면 StorageService 내부에서 무시하도록 설계되어 있음
+            // [핵심] 정식 유저인 경우에만 폴더 존재 여부 확인 및 자동 복구
+            if (user.getRole() == Role.USER) {
+                storageService.createUserDirectory(String.valueOf(user.getId()));
+            }
+
             String accessToken = jwtTokenProvider.createToken(user.getEmail(), user.getRole().name());
 
             Map<String, Object> response = new HashMap<>();

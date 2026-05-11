@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class UserService {
     private final UserRepository userRepository;
+    private final StorageService storageService;
 
     @Transactional
     public void signup(String email, String nickname) {
@@ -19,6 +20,9 @@ public class UserService {
 
         // 엔티티의 승급 메서드 호출 (JPA 더티 체킹으로 자동 DB 업데이트)
         user.authorizeUser(nickname);
+
+        // 2. 유저 전용 디렉토리 생성 (유저 ID를 폴더명으로 사용 권장)
+        storageService.createUserDirectory(String.valueOf(user.getId()));
     }
 
     @Transactional(readOnly = true)
