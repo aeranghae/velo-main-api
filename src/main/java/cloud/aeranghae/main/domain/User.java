@@ -54,4 +54,9 @@ public class User {
         this.name = nickname; // 닉네임 업데이트
         this.role = Role.USER; // 권한을 정식 유저로 승급
     }
+
+    public void updateNickname(String newNickname) {
+        // 공백 검증 등 추가적인 비즈니스 룰을 여기서 체크해도 좋을듯
+        this.name = newNickname;
+    }
 }

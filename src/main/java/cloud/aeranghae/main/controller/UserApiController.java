@@ -6,10 +6,7 @@ import cloud.aeranghae.main.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RequiredArgsConstructor
 @RestController
@@ -52,6 +49,26 @@ public class UserApiController {
             return ResponseEntity.ok(userInfo);
         } catch (Exception e) {
             return ResponseEntity.status(404).body("사용자 정보를 찾을 수 없습니다.");
+        }
+    }
+
+    @PatchMapping("/api/user/nickname")
+    public ResponseEntity<String> updateNickname(@RequestBody SignupRequestDto requestDto,
+                                                 @AuthenticationPrincipal String email) {
+        if (email == null) {
+            return ResponseEntity.status(401).body("인증 정보가 없습니다.");
+        }
+
+        if (requestDto.getNickname() == null || requestDto.getNickname().isBlank()) {
+            return ResponseEntity.badRequest().body("유효하지 않은 닉네임입니다.");
+        }
+
+        try {
+            // 이미 가입된 유저의 name(닉네임)만 변경하는 서비스 호출
+            userService.updateNickname(email, requestDto.getNickname());
+            return ResponseEntity.ok("success");
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("닉네임 변경 실패: " + e.getMessage());
         }
     }
 

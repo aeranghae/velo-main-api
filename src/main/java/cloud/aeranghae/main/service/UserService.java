@@ -34,4 +34,13 @@ public class UserService {
                 user.getRole().name()
         );
     }
+
+    @Transactional
+    public void updateNickname(String email, String newNickname) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+        // JPA Dirty Checking에 의해 name이 변경되고 트랜잭션 종료 시 DB에 반영됨
+        user.updateNickname(newNickname);
+    }
 }
