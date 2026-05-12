@@ -123,3 +123,7 @@ installer = nginx
 
 - **`authenticator = nginx`**: 인증을 위해 Nginx 플러그인을 사용합니다.
 - **`installer = nginx`**: 갱신된 인증서를 Nginx 설정에 자동으로 적용합니다.
+
+
+## License
+이 프로젝트는 Apache License 2.0을 따릅니다. 자세한 내용은 [LICENSE](./LICENSE) 파일을 확인하세요.
