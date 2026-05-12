@@ -72,7 +72,7 @@ public class SecurityConfig {
         // 허용할 헤더
         config.setAllowedHeaders(List.of("*"));
         // 인증 정보(쿠키, 헤더 등)를 포함한 요청 허용 여부
-        config.setAllowCredentials(true);
+        //config.setAllowCredentials(true);
 
         config.setExposedHeaders(List.of("Authorization")); // 리액트에서 토큰을 읽어야 할 경우 대비
 
