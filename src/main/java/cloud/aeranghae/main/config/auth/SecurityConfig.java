@@ -44,6 +44,7 @@ public class SecurityConfig {
 
                 // 4. API 엔드포인트 권한(문지기) 설정
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         // 방금 만든 구글 로그인 검증 API는 누구나 접근 가능해야 함
                         .requestMatchers("/api/auth/google").permitAll()
                         // 나중에 SSE 통신이나 다른 열어둘 API가 있다면 여기에 추가
