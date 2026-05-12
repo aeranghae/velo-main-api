@@ -21,12 +21,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
-        // OPTIONS 요청(Preflight)이면 토큰 검사 없이 바로 다음 필터로 넘김
-        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
-            response.setStatus(HttpServletResponse.SC_OK);
-            return;
-        }
-
         // 1. 클라이언트(리액트)의 요청 헤더에서 JWT 토큰을 꺼냅니다.
         String token = resolveToken(request);
 

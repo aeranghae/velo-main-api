@@ -13,6 +13,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 
 import java.util.List;
 
@@ -52,8 +53,8 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
 
-                // 5. 추가된 핵심 부분: 스프링 기본 인증 필터가 돌기 '전'에 우리가 만든 JWT 필터 끼워넣기!
-                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class);
+                // 5. 추가된 핵심 부분: 스프링 기본 인증 필터가 돌기 '전'에 우리가 만든 JWT 필터 끼워넣기! UsernamePasswordAuthenticationFilter.class
+                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), CorsFilter.class);
 
         return http.build();
     }
