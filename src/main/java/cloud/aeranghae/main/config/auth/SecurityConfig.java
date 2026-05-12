@@ -66,7 +66,6 @@ public class SecurityConfig {
         // 일렉트론(리액트) 로컬 개발 서버 주소 명시적 허용
         //config.setAllowedOrigins(allowedOrigins);
         config.setAllowedOriginPatterns(List.of("*"));
-
         // 허용할 HTTP 메서드
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         // 허용할 헤더
