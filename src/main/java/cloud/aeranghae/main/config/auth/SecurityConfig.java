@@ -63,13 +63,17 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
 
         // 일렉트론(리액트) 로컬 개발 서버 주소 명시적 허용
-        config.setAllowedOrigins(allowedOrigins);
+        //config.setAllowedOrigins(allowedOrigins);
+        config.setAllowedOriginPatterns(List.of("*"));
+
         // 허용할 HTTP 메서드
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         // 허용할 헤더
         config.setAllowedHeaders(List.of("*"));
         // 인증 정보(쿠키, 헤더 등)를 포함한 요청 허용 여부
         config.setAllowCredentials(true);
+
+        config.setExposedHeaders(List.of("Authorization")); // 리액트에서 토큰을 읽어야 할 경우 대비
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         // 모든 API 경로("/**")에 대해 위 설정 적용
