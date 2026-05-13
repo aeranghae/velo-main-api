@@ -68,12 +68,6 @@ public class StorageService {
         Path projectPath = Paths.get(baseStoragePath, String.valueOf(user.getId()), uuid);
         try {
             Files.createDirectories(projectPath);
-
-            //TODO: 각종 스택 요구사항 파싱 및 LLM서버로 요청 전달
-            // 1. 개발 요청을 진행 (LLM에서 코드를 작성) 전체 파일 개수
-            // 2. 스프링으로 전달
-            // 3. 파일 작성 <- 해당 사용자에게 로그 전송 (로그를 지속적으로 파일에 작성하게하고 사용자는 필요할때마다 들어와서 해당 로그파일을 읽는 방식..?)
-            // 4. 로그가 작성이되는걸 실시간으로 전송 (단 사용자가 해당 메뉴에 있을 경우에만 아니면 전송안함)
             
         } catch (IOException e) {
             throw new RuntimeException("프로젝트 폴더 생성 실패: " + uuid, e);
