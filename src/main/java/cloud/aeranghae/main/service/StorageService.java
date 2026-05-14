@@ -1,8 +1,10 @@
 package cloud.aeranghae.main.service;
 
 import cloud.aeranghae.main.controller.dto.ProjectResponseDto;
+import cloud.aeranghae.main.domain.AiModel;
 import cloud.aeranghae.main.domain.Project;
 import cloud.aeranghae.main.domain.User;
+import cloud.aeranghae.main.repository.AiModelRepository;
 import cloud.aeranghae.main.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +34,7 @@ import java.util.stream.Collectors;
 public class StorageService {
 
     private final ProjectRepository projectRepository;
+    private final AiModelRepository aiModelRepository;
 
     @Value("${aeranghae.storage.path}")
     private String baseStoragePath;
@@ -57,15 +60,35 @@ public class StorageService {
      */
     @Transactional
     @CacheEvict(value = "projectList", key = "#user.id")
-    public ProjectResponseDto createProject(User user, String projectName) {
+    public ProjectResponseDto createProject(User user, String projectName, String projectModel) {
         String uuid = UUID.randomUUID().toString();
+
+        // 1. 사용할 모델 결정 로직
+        AiModel targetModel = null;
+
+        // 전달받은 projectModel 이름이 있는 경우 조회 시도
+        if (projectModel != null && !projectModel.trim().isEmpty()) {
+            targetModel = aiModelRepository.findByModelNameAndIsActiveTrue(projectModel)
+                    .orElse(null); // 이름으로 못 찾으면 일단 null
+        }
+
+        // projectModel이 없거나, DB에서 찾지 못한 경우 유저의 기본 모델 사용
+        if (targetModel == null) {
+            targetModel = user.getModel();
+        }
+
+        // [방어 코드] 만약 유저의 기본 모델조차 없다면 시스템 전체 기본 모델 조회
+        if (targetModel == null) {
+            targetModel = aiModelRepository.findByDefaultActiveTrue()
+                    .orElseThrow(() -> new IllegalStateException("사용 가능한 AI 모델이 시스템에 존재하지 않습니다."));
+        }
 
         // 1. DB에 프로젝트 메타데이터 저장
         Project project = projectRepository.save(Project.builder()
                 .name(projectName)
                 .uuid(uuid)
                 .user(user)
-                .model(user.getModel())
+                .model(targetModel)
                 .build());
 
         // 2. 물리적 폴더 생성: {baseStoragePath}/{userId}/{uuid}

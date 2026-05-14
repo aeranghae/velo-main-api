@@ -4,6 +4,7 @@ import cloud.aeranghae.main.controller.dto.ProjectCreateRequestDto;
 import cloud.aeranghae.main.controller.dto.ProjectResponseDto;
 import cloud.aeranghae.main.controller.dto.ProjectStatusResponseDto;
 import cloud.aeranghae.main.domain.User;
+import cloud.aeranghae.main.repository.AiModelRepository;
 import cloud.aeranghae.main.repository.UserRepository;
 import cloud.aeranghae.main.service.ProjectService;
 import cloud.aeranghae.main.service.StorageService;
@@ -33,7 +34,7 @@ public class ProjectApiController {
 
         // 2. 기본 폴더 및 프로젝트 엔티티 생성 (기존 기능 활용)
         // storageService에서 UUID 기반 폴더 생성이 이뤄짐
-        ProjectResponseDto projectInfo = storageService.createProject(user, requestDto.getProjectName());
+        ProjectResponseDto projectInfo = storageService.createProject(user, requestDto.getProjectName(), requestDto.getModel());
 
         // 3. 생성된 폴더 내부에 상세 데이터 기반으로 자동화 공정 시작
         // 이 단계에서 FastAPI(LLM 서버)로 framework, language, prompt 등을 전송

@@ -47,12 +47,13 @@ public class StorageApiController {
                 .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
 
         String projectName = request.get("projectName"); // 리액트에서 보낸 프로젝트 이름
+        String modelName = request.get("modelName");
 
         if (projectName == null || projectName.isBlank()) {
             return ResponseEntity.badRequest().build();
         }
 
-        ProjectResponseDto newProject = storageService.createProject(user, projectName);
+        ProjectResponseDto newProject = storageService.createProject(user, projectName, modelName);
         return ResponseEntity.ok(newProject);
     }
 
