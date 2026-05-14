@@ -7,6 +7,8 @@ import cloud.aeranghae.main.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,6 +56,7 @@ public class StorageService {
      * 새 프로젝트 생성 (DB 등록 + UUID 폴더 생성)
      */
     @Transactional
+    @CacheEvict(value = "projectList", key = "#user.id")
     public ProjectResponseDto createProject(User user, String projectName) {
         String uuid = UUID.randomUUID().toString();
 
@@ -80,6 +83,7 @@ public class StorageService {
      * 사용자 프로젝트 상세 목록 조회 (DB 정보 + 물리적 통계)
      */
     @Transactional(readOnly = true)
+    @Cacheable(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
     public List<ProjectResponseDto> getUserProjectDetails(User user) {
         List<Project> projects = projectRepository.findByUserOrderByLastModifiedAtDesc(user);
 
@@ -158,6 +162,7 @@ public class StorageService {
 
     // 1. 프로젝트 이름 변경 (논리적 변경)
     @Transactional
+    @CacheEvict(value = "projectList", key = "#user.id")
     public ProjectResponseDto updateProjectName(User user, String uuid, String newName) {
         Project project = projectRepository.findByUuid(uuid)
                 .filter(p -> p.getUser().getId().equals(user.getId())) // 본인 확인
@@ -171,6 +176,7 @@ public class StorageService {
 
     // 2. 프로젝트 삭제 (DB + 물리 폴더)
     @Transactional
+    @CacheEvict(value = "projectList", key = "#user.id")
     public void deleteProject(User user, String uuid) {
         Project project = projectRepository.findByUuid(uuid)
                 .filter(p -> p.getUser().getId().equals(user.getId()))

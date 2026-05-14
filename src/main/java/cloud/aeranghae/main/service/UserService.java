@@ -4,6 +4,8 @@ import cloud.aeranghae.main.controller.dto.UserResponseDto;
 import cloud.aeranghae.main.domain.User;
 import cloud.aeranghae.main.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +16,7 @@ public class UserService {
     private final StorageService storageService;
 
     @Transactional
+    @CacheEvict(value = "userCache", key = "#email") // 혹시 남아있을지 모를 가입 전 캐시 삭제
     public void signup(String email, String nickname) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
@@ -26,6 +29,7 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "userCache", key = "#email", cacheManager = "cacheManager")
     public UserResponseDto getUserInfoByEmail(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("해당 사용자가 없습니다. email=" + email));
@@ -40,6 +44,7 @@ public class UserService {
     }
 
     @Transactional
+    @CacheEvict(value = "userCache", key = "#email") // 닉네임 변경 시 해당 유저 캐시 삭제
     public void updateNickname(String email, String newNickname) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
