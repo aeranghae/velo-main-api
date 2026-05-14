@@ -22,6 +22,11 @@ public class Project {
     @Column(unique = true, nullable = false, updatable = false)
     private String uuid; // 물리 저장소 식별자 (생성 후 변경 불가)
 
+    // 현제 프로젝트에 적용된 ai model
+    @ManyToOne(fetch = FetchType.LAZY) // 지연 로딩 권장
+    @JoinColumn(name = "ai_model_id") // DB 컬럼명
+    private AiModel model;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
@@ -30,10 +35,11 @@ public class Project {
     private LocalDateTime lastModifiedAt;
 
     @Builder
-    public Project(String name, String uuid, User user) {
+    public Project(String name, String uuid, User user,  AiModel model) {
         this.name = name;
         this.uuid = uuid;
         this.user = user;
+        this.model = model;
         this.createdAt = LocalDateTime.now();
         this.lastModifiedAt = LocalDateTime.now();
     }

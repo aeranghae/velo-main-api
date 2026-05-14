@@ -1,5 +1,6 @@
 package cloud.aeranghae.main.controller.dto;
 
+import cloud.aeranghae.main.domain.AiModel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -11,5 +12,6 @@ public class UserResponseDto {
     private String name;
     private String email;
     private String picture;
+    private String model;
     private String role;
 }

@@ -65,6 +65,7 @@ public class StorageService {
                 .name(projectName)
                 .uuid(uuid)
                 .user(user)
+                .model(user.getModel())
                 .build());
 
         // 2. 물리적 폴더 생성: {baseStoragePath}/{userId}/{uuid}
@@ -136,6 +137,7 @@ public class StorageService {
                 return ProjectResponseDto.builder()
                         .projectName(project.getName())
                         .uuid(project.getUuid())
+                        .model(project.getModel().getModelName())
                         .createdAt(project.getCreatedAt().format(formatter))
                         .lastModified("정보 없음")
                         .size(0L)
@@ -148,6 +150,7 @@ public class StorageService {
             return ProjectResponseDto.builder()
                     .projectName(project.getName())
                     .uuid(project.getUuid())
+                    .model(project.getModel().getModelName()) // 프로젝트 폴더 조회시 모델명은 객체가 아닌 모델 이름만 전달
                     .createdAt(project.getCreatedAt().format(formatter))
                     .lastModified(LocalDateTime.ofInstant(attrs.lastModifiedTime().toInstant(), ZoneId.systemDefault()).format(formatter))
                     .size(calculateDirectorySize(path))

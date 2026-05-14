@@ -24,16 +24,21 @@ public class User {
     @Column
     private String picture;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ai_model_id")
+    private AiModel model;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
 
     @Builder
-    public User(String name, String email, String picture, Role role) {
+    public User(String name, String email, String picture, Role role,  AiModel model) {
         this.name = name;
         this.email = email;
         this.picture = picture;
         this.role = role;
+        this.model = model;
     }
 
     public User update(String name, String picture) {
@@ -58,5 +63,9 @@ public class User {
     public void updateNickname(String newNickname) {
         // 공백 검증 등 추가적인 비즈니스 룰을 여기서 체크해도 좋을듯
         this.name = newNickname;
+    }
+
+    public void updateModel(AiModel model) {
+        this.model = model;
     }
 }

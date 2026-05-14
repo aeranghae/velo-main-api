@@ -41,6 +41,7 @@ public class AuthApiController {
             response.put("accessToken", accessToken);
             response.put("name", user.getName()); // 이게 닉네임임 작성하면 덮어쓰기됨
             response.put("email", user.getEmail());
+            response.put("model", user.getModel().getModelName());
             response.put("picture", user.getPicture());
             response.put("role", user.getRole());
 

@@ -39,6 +39,7 @@ public class UserService {
                 user.getName(),
                 user.getEmail(),
                 user.getPicture(),
+                user.getModel().getModelName(), // api키 유출 방지를 위한 이름만 전송
                 user.getRole().name()
         );
     }

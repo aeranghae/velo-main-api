@@ -33,10 +33,23 @@ public class AiModel {
 
     private boolean isActive; // 현재 사용 가능한 모델인지 여부
 
+    private boolean defaultActive; // 기본 모델 지정 여부
+
     // 업데이트 로직
     public void updateInfo(String apiKey, String endpoint, boolean isActive) {
         this.apiKey = apiKey;
         this.endpoint = endpoint;
         this.isActive = isActive;
+    }
+
+    // 기본 설정 해제
+    public void releaseDefault() {
+        this.defaultActive = false;
+    }
+
+    // 기본 설정 지정
+    public void setAsDefault() {
+        this.isActive = true; // 기본 모델은 당연히 활성화 상태여야 함
+        this.defaultActive = true;
     }
 }
