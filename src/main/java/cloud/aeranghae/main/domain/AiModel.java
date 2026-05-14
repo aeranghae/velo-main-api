@@ -1,5 +1,6 @@
 package cloud.aeranghae.main.domain;
 
+import cloud.aeranghae.main.util.encryption.ApiKeyConverter;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,6 +24,7 @@ public class AiModel {
     @Column(nullable = false)
     private String provider;  // 예: "OpenAI", "Anthropic", "Google"
 
+    @Convert(converter = ApiKeyConverter.class)
     @Column(nullable = false)
     private String apiKey;    // 각 모델별 API Key
 
