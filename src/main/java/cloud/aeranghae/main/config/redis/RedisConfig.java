@@ -36,9 +36,14 @@ public class RedisConfig {
     }
 
     @Bean
-    public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory, ObjectMapper objectMapper) {
-        GenericJacksonJsonRedisSerializer serializer = new GenericJacksonJsonRedisSerializer(objectMapper);
+    public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
+        // 1. builder() 대신 create() 메서드를 사용하여 간결하게 생성합니다.
+        // 이 방식은 4.0에서 클래스 정보를 JSON에 포함하도록 기본 설정되어 있습니다.
+        GenericJacksonJsonRedisSerializer serializer = GenericJacksonJsonRedisSerializer.create(configurer -> {
+            // 내부적으로 ObjectMapper 설정을 자동으로 수행합니다.
+        });
 
+        // 2. 캐시 설정
         RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
                 .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(serializer))

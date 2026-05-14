@@ -2,6 +2,7 @@ package cloud.aeranghae.main.controller.dto;
 
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Getter
 @Builder
