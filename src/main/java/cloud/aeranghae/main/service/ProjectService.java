@@ -22,7 +22,7 @@ public class ProjectService {
     private final ProjectRepository projectRepository;
     // private final RestTemplate restTemplate; // FastAPI 호출용
 
-    @Value("${llm.server.url}")
+    @Value("${llm.server.url:http://localhost:8000}")
     private String llmServerUrl;
 
     /**
