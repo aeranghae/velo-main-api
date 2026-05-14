@@ -4,12 +4,14 @@ import cloud.aeranghae.main.controller.dto.SignupRequestDto;
 import cloud.aeranghae.main.controller.dto.UserResponseDto;
 import cloud.aeranghae.main.service.UserService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RequiredArgsConstructor
 @RestController
+@Slf4j
 public class UserApiController {
 
     private final UserService userService;
@@ -39,15 +41,14 @@ public class UserApiController {
 
     @GetMapping("/api/user/me")
     public ResponseEntity<?> getMyInfo(@AuthenticationPrincipal String email) {
-        if (email == null) {
-            return ResponseEntity.status(401).body("인증되지 않은 사용자입니다.");
-        }
+        log.info("내 정보 조회 요청 시작 - email: {}", email); // 로그 남기기
 
         try {
-            // 이메일로 유저 정보를 조회하여 DTO로 반환
             UserResponseDto userInfo = userService.getUserInfoByEmail(email);
             return ResponseEntity.ok(userInfo);
         } catch (Exception e) {
+            // 에러 발생 시 원인을 정확히 찍어줍니다.
+            log.error("내 정보 조회 중 에러 발생! 원인: {}", e.getMessage(), e);
             return ResponseEntity.status(404).body("사용자 정보를 찾을 수 없습니다.");
         }
     }
