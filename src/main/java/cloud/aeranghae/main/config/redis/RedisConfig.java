@@ -21,8 +21,12 @@ public class RedisConfig {
     @Bean
     public GenericJacksonJsonRedisSerializer jacksonRedisSerializer() {
         return GenericJacksonJsonRedisSerializer.builder()
-                .enableDefaultTyping()           // 타입 정보를 JSON에 포함
-                .enableSpringCacheNullValueSupport() // @Cacheable의 null 캐싱 지원
+                .enableDefaultTyping(
+                        tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator.builder()
+                                .allowIfBaseType(Object.class)
+                                .build()
+                )
+                .enableSpringCacheNullValueSupport()
                 .build();
     }
 
