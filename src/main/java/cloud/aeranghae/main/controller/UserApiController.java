@@ -41,14 +41,14 @@ public class UserApiController {
 
     @GetMapping("/api/user/me")
     public ResponseEntity<?> getMyInfo(@AuthenticationPrincipal String email) {
-        log.info("내 정보 조회 요청 시작 - email: {}", email); // 로그 남기기
+        //log.info("내 정보 조회 요청 시작 - email: {}", email); // 로그 남기기
 
         try {
             UserResponseDto userInfo = userService.getUserInfoByEmail(email);
             return ResponseEntity.ok(userInfo);
         } catch (Exception e) {
             // 에러 발생 시 원인을 정확히 찍어줍니다.
-            log.error("내 정보 조회 중 에러 발생! 원인: {}", e.getMessage(), e);
+            //log.error("내 정보 조회 중 에러 발생! 원인: {}", e.getMessage(), e);
             return ResponseEntity.status(404).body("사용자 정보를 찾을 수 없습니다.");
         }
     }
