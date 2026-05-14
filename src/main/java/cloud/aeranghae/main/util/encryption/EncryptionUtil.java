@@ -1,5 +1,6 @@
 package cloud.aeranghae.main.util.encryption;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -10,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
 
+@Slf4j
 @Component
 public class EncryptionUtil {
 
@@ -43,7 +45,9 @@ public class EncryptionUtil {
             byte[] decoded = Base64.getDecoder().decode(cipherText);
             return new String(cipher.doFinal(decoded), StandardCharsets.UTF_8);
         } catch (Exception e) {
-            throw new RuntimeException("복호화 중 에러 발생", e);
+            // 복호화 실패 시 로그만 남기고 일단 원본 반환 (임시 방편)
+            log.error("복호화 실패: {}", e.getMessage());
+            return cipherText;
         }
     }
 }
