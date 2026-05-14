@@ -1,6 +1,5 @@
 package cloud.aeranghae.main.service;
 
-
 import cloud.aeranghae.main.controller.dto.ProjectCreateRequestDto;
 import cloud.aeranghae.main.controller.dto.ProjectStatusResponseDto;
 import cloud.aeranghae.main.repository.ProjectRepository;
@@ -29,7 +28,7 @@ public class ProjectService {
     /**
      * 프로젝트 자동화 생성 프로세스 시작
      */
-    @Async // 시간이 걸리는 작업이므로 비동기 처리 권장
+    @Async // 시간이 걸리는 작업이므로 비동기 처리
     public void initiateAutomation(Long projectId, ProjectCreateRequestDto details) {
         try {
             log.info("프로젝트 생성 자동화 시작: {}", details.getProjectName());
@@ -44,11 +43,16 @@ public class ProjectService {
             // 2. FastAPI 호출 (LLM을 통해 코드 구조 생성)
             //ResponseEntity<String> response = restTemplate.postForEntity(llmServerUrl + "/generate", llmRequest, String.class);
 
+            // TODO: 호출 로그 기록을 데이터베이스에 저장해야함
+
             // 3. 받은 데이터(JSON 등)를 바탕으로 파일 생성 로직 실행
             // createFileStructures(projectId, response.getBody());
 
             log.info("프로젝트 생성 자동화 완료: {}", projectId);
         } catch (Exception e) {
+            // 오류가 발생하면 기존 작업을 종료하는 프로세스 혹은 재요청하는 프로세스 필요
+            // 프로젝트 폴더삭제 등등
+            // 혹은 호출 로그 기록 바탕으로 재요청 진행 (max 3회 실패시 프로젝트 파기)
             log.error("자동화 프로세스 중 오류 발생: {}", e.getMessage());
             // 필요한 경우 DB에 상태를 'ERROR'로 업데이트
         }
@@ -77,17 +81,21 @@ public class ProjectService {
         try {
             // 1. 시작 단계
             updateStatus(projectId, "PROCESSING", 10, "프로젝트 구조 설계 중...");
+            // 과함께 상세 실시간 로그 확인
 
             // 2. FastAPI 호출 시뮬레이션
             Thread.sleep(2000); // 작업 시간 대기
             updateStatus(projectId, "PROCESSING", 50, "LLM 서버에서 소스 코드 생성 중...");
+            // 과함께 상세 실시간 로그 확인
 
             // 3. 파일 쓰기 단계
             Thread.sleep(3000);
             updateStatus(projectId, "PROCESSING", 80, "서버 로컬 디렉토리에 파일 저장 중...");
+            // 과함께 상세 실시간 로그 확인
 
             // 4. 완료
             updateStatus(projectId, "COMPLETED", 100, "프로젝트 생성이 완료되었습니다!");
+            // 과함께 상세 실시간 로그 확인
 
         } catch (Exception e) {
             updateStatus(projectId, "ERROR", 0, "오류 발생: " + e.getMessage());

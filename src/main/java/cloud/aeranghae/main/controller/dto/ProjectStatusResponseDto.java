@@ -2,9 +2,11 @@ package cloud.aeranghae.main.controller.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Getter
 @AllArgsConstructor
+@NoArgsConstructor
 public class ProjectStatusResponseDto {
     private String projectId;
     private String status;      // PENDING, PROCESSING, COMPLETED, ERROR
