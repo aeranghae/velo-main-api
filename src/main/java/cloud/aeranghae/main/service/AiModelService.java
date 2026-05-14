@@ -6,6 +6,8 @@ import cloud.aeranghae.main.domain.User;
 import cloud.aeranghae.main.repository.AiModelRepository;
 import cloud.aeranghae.main.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +21,7 @@ public class AiModelService {
     private final AiModelRepository aiModelRepository;
     private final UserRepository userRepository;
 
+    @Cacheable(value = "aiModelList")
     @Transactional(readOnly = true)
     public List<AiModelNameResponseDto> getActiveModelNames() {
         return aiModelRepository.findAllByIsActiveTrue().stream()
@@ -29,6 +32,7 @@ public class AiModelService {
                 .collect(Collectors.toList());
     }
 
+    @CacheEvict(value = "aiModelList", allEntries = true)
     @Transactional
     public void setDefaultModel(Long modelId) {
         // 1. 기존에 기본값으로 설정된 모델들을 모두 false로 변경
@@ -42,6 +46,7 @@ public class AiModelService {
         newDefault.setAsDefault();
     }
 
+    @CacheEvict(value = "userCache", key = "#email")
     @Transactional
     public void updateDefaultModel(String email, String modelName) {
         // 1. 해당 모델이 존재하는지, 그리고 활성화 상태인지 확인
