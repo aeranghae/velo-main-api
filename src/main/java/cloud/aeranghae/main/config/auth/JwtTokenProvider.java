@@ -17,8 +17,8 @@ public class JwtTokenProvider {
 
     // application.yml 에 임의의 긴 비밀번호를 설정해두고 가져옵니다.
     public JwtTokenProvider(
-            @Value("${jwt.secret:vmfhaltmskdlstkfkdgodyauddlsclfrn1234567890!@#}") String secret,
-            @Value("${jwt.expiration:3600000}") long validityInMilliseconds) { // 기본 1시간
+            @Value("${jwt.secret}") String secret,
+            @Value("${jwt.expiration}") long validityInMilliseconds) { // 기본 1시간
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.validityInMilliseconds = validityInMilliseconds;
     }
