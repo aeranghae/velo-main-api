@@ -25,7 +25,7 @@ public class AiModel {
     private String provider;  // 예: "OpenAI", "Anthropic", "Google"
 
     @Convert(converter = ApiKeyConverter.class)
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String apiKey;    // 각 모델별 API Key
 
     @Column(nullable = false)
