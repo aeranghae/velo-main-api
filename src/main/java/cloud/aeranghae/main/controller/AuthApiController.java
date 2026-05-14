@@ -17,7 +17,7 @@ import java.util.Map;
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "http://localhost:5173")
-public class AuthController {
+public class AuthApiController {
 
     private final GoogleAuthService googleAuthService;
     private final JwtTokenProvider jwtTokenProvider;

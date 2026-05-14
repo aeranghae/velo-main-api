@@ -46,7 +46,7 @@ public class ProjectService {
             // TODO: 호출 로그 기록을 데이터베이스에 저장해야함
 
             // 3. 받은 데이터(JSON 등)를 바탕으로 파일 생성 로직 실행
-            // createFileStructures(projectId, response.getBody());
+            //createFileStructures(projectId, response.getBody());
 
             log.info("프로젝트 생성 자동화 완료: {}", projectId);
         } catch (Exception e) {

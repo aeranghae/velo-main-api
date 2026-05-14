@@ -16,7 +16,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/storage")
 @RequiredArgsConstructor
-public class StorageController {
+public class StorageApiController {
 
     private final StorageService storageService;
     private final UserRepository userRepository;
