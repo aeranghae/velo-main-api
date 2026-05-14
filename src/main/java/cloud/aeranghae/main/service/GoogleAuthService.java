@@ -10,6 +10,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Collections;
 
 @RequiredArgsConstructor
+@Slf4j
 @Service
 public class GoogleAuthService {
 
@@ -48,7 +50,12 @@ public class GoogleAuthService {
         String pictureUrl = (String) payload.get("picture");
 
         AiModel defaultModel = aiModelRepository.findByDefaultActiveTrue()
-                .orElseThrow(() -> new IllegalStateException("기본 AI 모델이 설정되어 있지 않습니다."));
+                .or(() -> aiModelRepository.findAllByIsActiveTrue().stream().findFirst())
+                .orElse(null);
+
+        if (defaultModel == null) {
+            log.warn("⚠️ 현재 DB에 활성화된 AI 모델이 하나도 없습니다. 신규 유저에게 모델이 배정되지 않습니다.");
+        }
 
         // 4. 우리 DB에 있는 회원인지 확인 후, 없으면 자동 회원가입(Save), 있으면 정보 업데이트
         User user = userRepository.findByEmail(email)
