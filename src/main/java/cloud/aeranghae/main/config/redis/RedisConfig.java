@@ -57,7 +57,7 @@ public class RedisConfig {
                         .fromSerializer(new StringRedisSerializer()))
                 .serializeValuesWith(RedisSerializationContext.SerializationPair
                         .fromSerializer(serializer))
-                .entryTtl(Duration.ofMinutes(10));
+                .entryTtl(Duration.ofMinutes(10)); //캐시 유지 시간
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(config)
