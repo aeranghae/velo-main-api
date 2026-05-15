@@ -40,7 +40,7 @@ public class ProjectApiController {
 
         int projectCount = projectRepository.countByUser(user);
         if (projectCount >= maxProjectGenerateCount) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+            return ResponseEntity.status(429)
                     .build();
         }
 
