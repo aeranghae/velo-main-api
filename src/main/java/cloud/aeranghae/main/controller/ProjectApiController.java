@@ -40,6 +40,7 @@ public class ProjectApiController {
 
         int projectCount = projectRepository.countByUser(user);
         if (projectCount >= maxProjectGenerateCount) {
+            // 최대 6개 초과 생성 불가
             return ResponseEntity.status(429)
                     .build();
         }

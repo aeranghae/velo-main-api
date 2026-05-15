@@ -1,108 +1,71 @@
-name: 애랑해 메인 서버 배포 (CI/CD)
+name: Scripto Main API CI/CD
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-    types: [closed]
+    tags:
+      - 'v*' # 깃허브 태그는 기존처럼 v1.0.0 형식으로 푸시합니다.
+
+permissions:
+  contents: write
+  packages: write
 
 jobs:
   build-and-deploy:
-    # 푸시 이벤트이거나, PR이 머지된 경우에만 실행
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
-
     steps:
-      - name: 1. 소스 코드 가져오기
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: 2. 자바 21 환경 설정
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
+          cache: 'gradle'
 
-      - name: 3. 빌드 권한 부여
-        run: chmod +x gradlew
+      # 1. 스프링 부트 빌드
+      - name: Build with Gradle
+        run: ./gradlew bootJar -x test
 
-      - name: 4. 프로젝트 빌드 (테스트 제외)
-        run: ./gradlew clean build -x test
-
-      - name: 5. 빌드 파일 서버로 전송 (SCP)
-        uses: appleboy/scp-action@master
+      # 2. GitHub Release 생성 및 JAR 파일 업로드
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
         with:
-          host: ${{ secrets.REMOTE_IP }}
-          username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
-          source: "build/libs/*.jar"
-          target: "~/app"
-          strip_components: 2
+          files: build/libs/main-api-*.jar
+          body: "Release version ${{ github.ref_name }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 6. 서버에서 애플리케이션 실행 및 백업 (SSH)
-        uses: appleboy/ssh-action@master
+      # 3. 도커 빌드를 위한 로그인 (Docker Hub & GitHub Packages)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          host: ${{ secrets.REMOTE_IP }}
-          username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
-          script: |
-            # Zsh 환경 호환성 설정
-            [[ -n $ZSH_VERSION ]] && setopt NULL_GLOB 2>/dev/null || true
-            
-            echo "--- 서버 배포 스크립트 시작 ---"
-            APP_PATH="$HOME/app"
-            BACKUP_PATH="$APP_PATH/backup"
-            mkdir -p $BACKUP_PATH
-            
-            # 6-1. 구버전 파일 백업
-            # 새로 전송된 파일을 제외한 기존 .jar 파일들을 백업 디렉토리로 이동
-            echo "구버전 파일 백업 중..."
-            ls -t $APP_PATH/main-api-*.jar 2>/dev/null | tail -n +2 | while read -r old_jar; do
-                TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-                mv "$old_jar" "$BACKUP_PATH/$(basename "$old_jar" .jar)_$TIMESTAMP.jar"
-                echo "백업 완료: $old_jar"
-            done
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-            # 6-2. 기존 프로세스 종료
-            echo "기존 프로세스 종료 중..."
-            PID=$(pgrep -f 'main-api' || true)
-            if [ -n "$PID" ]; then
-              kill -15 $PID 2>/dev/null || true
-              sleep 7
-              kill -9 $PID 2>/dev/null || true
-            fi
-            
-            # 6-3. 불필요한 빌드 아티팩트 정리
-            rm -f $APP_PATH/*-plain.jar 2>/dev/null || true
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-            # 6-4. 새로운 버전 실행 (실행 위치 고정)
-            echo "새로운 버전 실행 시도..."
-            # 최신 파일을 찾음
-            NEW_JAR_PATH=$(ls -t $APP_PATH/main-api-*.jar 2>/dev/null | head -n 1)
+      # 4. [핵심 추가] 태그명에서 앞글자 'v'를 제거하고 소문자 레포명 셋업하기
+      - name: Set up clean version and lower case repo name
+        run: |
+          # v1.0.0에서 v를 제외한 1.0.0만 추출하여 CLEAN_VERSION에 저장
+          echo "CLEAN_VERSION=${GITHUB_REF_NAME#v}" >> ${GITHUB_ENV}
+          echo "REPO_LC=${GITHUB_REPOSITORY,,}" >> ${GITHUB_ENV}
 
-            if [ -z "$NEW_JAR_PATH" ]; then
-              echo "실행할 JAR 파일을 찾을 수 없습니다."
-              exit 1
-            fi
-
-            NEW_JAR_NAME=$(basename "$NEW_JAR_PATH")
-            echo "실행 파일: $NEW_JAR_NAME"
-
-            # 작업 디렉토리를 app으로 이동 후 실행 (상대 경로 및 로그 위치 일관성 유지)
-            cd $APP_PATH
-            nohup java -jar "$NEW_JAR_NAME" \
-              --spring.config.location=file:./application.yml,file:./application-oauth.yml \
-              > ./app.log 2>&1 &
-
-            # 6-5. 실행 결과 모니터링
-            echo "스프링 부트 초기화 대기 중 (15초)..."
-            sleep 15
-
-            if pgrep -f 'main-api' > /dev/null; then
-              echo "--- [성공] 서버가 $APP_PATH 위치에서 정상 실행되었습니다! ---"
-              ps -ef | grep 'main-api' | grep -v grep
-            else
-              echo "--- [실패] 서버 실행 실패. 최신 로그 내용을 확인하세요. ---"
-              tail -n 30 ./app.log
-              exit 1
-            fi
+      # 5. 도커 이미지 빌드 후 양쪽 저장소에 동시 푸시 (v가 빠진 버전 태그 적용)
+      - name: Build and push Docker images
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            oxxultus/scripto-main:latest
+            oxxultus/scripto-main:${{ env.CLEAN_VERSION }}
+            ghcr.io/${{ env.REPO_LC }}:latest
+            ghcr.io/${{ env.REPO_LC }}:${{ env.CLEAN_VERSION }}
