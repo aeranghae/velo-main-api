@@ -1,11 +1,14 @@
 package cloud.aeranghae.main.service;
 
+import cloud.aeranghae.main.controller.dto.ProjectCreateRequestDto;
 import cloud.aeranghae.main.controller.dto.ProjectResponseDto;
 import cloud.aeranghae.main.domain.AiModel;
 import cloud.aeranghae.main.domain.Project;
 import cloud.aeranghae.main.domain.User;
 import cloud.aeranghae.main.repository.AiModelRepository;
 import cloud.aeranghae.main.repository.ProjectRepository;
+import cloud.aeranghae.main.util.template.TemplateInitializer;
+import cloud.aeranghae.main.util.template.TemplateInitializerFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,6 +38,7 @@ public class StorageService {
 
     private final ProjectRepository projectRepository;
     private final AiModelRepository aiModelRepository;
+    private final TemplateInitializerFactory factory;
 
     @Value("${aeranghae.storage.path}")
     private String baseStoragePath;
@@ -60,15 +64,15 @@ public class StorageService {
      */
     @Transactional
     @CacheEvict(value = "projectList", key = "#user.id")
-    public ProjectResponseDto createProject(User user, String projectName, String projectModel) {
+    public ProjectResponseDto createProject(User user, ProjectCreateRequestDto requestDto) {
         String uuid = UUID.randomUUID().toString();
 
         // 1. 사용할 모델 결정 로직
         AiModel targetModel = null;
 
         // 전달받은 projectModel 이름이 있는 경우 조회 시도
-        if (projectModel != null && !projectModel.trim().isEmpty()) {
-            targetModel = aiModelRepository.findByModelNameAndIsActiveTrue(projectModel)
+        if (requestDto.getModel() != null && !requestDto.getModel().trim().isEmpty()) {
+            targetModel = aiModelRepository.findByModelNameAndIsActiveTrue(requestDto.getModel())
                     .orElse(null); // 이름으로 못 찾으면 일단 null
         }
 
@@ -85,7 +89,7 @@ public class StorageService {
 
         // 1. DB에 프로젝트 메타데이터 저장
         Project project = projectRepository.save(Project.builder()
-                .name(projectName)
+                .name(requestDto.getModel())
                 .uuid(uuid)
                 .user(user)
                 .model(targetModel)
@@ -95,7 +99,11 @@ public class StorageService {
         Path projectPath = Paths.get(baseStoragePath, String.valueOf(user.getId()), uuid);
         try {
             Files.createDirectories(projectPath);
-            
+
+            // 프레임워크에 맞는 기본 디렉토리 구조 생성
+            TemplateInitializer initializer = factory.getInitializer(requestDto.getFramework());
+            initializer.initialize(projectPath, requestDto);
+
         } catch (IOException e) {
             throw new RuntimeException("프로젝트 폴더 생성 실패: " + uuid, e);
         }

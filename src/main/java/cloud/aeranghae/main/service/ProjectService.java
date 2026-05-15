@@ -2,7 +2,9 @@ package cloud.aeranghae.main.service;
 
 import cloud.aeranghae.main.controller.dto.ProjectCreateRequestDto;
 import cloud.aeranghae.main.controller.dto.ProjectStatusResponseDto;
+import cloud.aeranghae.main.domain.User;
 import cloud.aeranghae.main.repository.ProjectRepository;
+import cloud.aeranghae.main.util.storage.DirectoryTreeBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -10,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.beans.factory.annotation.Value;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,18 +24,26 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ProjectService {
 
     private final ProjectRepository projectRepository;
+    private final DirectoryTreeBuilder directoryTreeBuilder;
     // private final RestTemplate restTemplate; // FastAPI 호출용
 
     @Value("${llm.server.url:http://localhost:8000}")
     private String llmServerUrl;
 
+    @Value("${aeranghae.storage.path}")
+    private String baseStoragePath;
+
     /**
      * 프로젝트 자동화 생성 프로세스 시작
      */
     @Async // 시간이 걸리는 작업이므로 비동기 처리
-    public void initiateAutomation(Long projectId, ProjectCreateRequestDto details) {
+    public void initiateAutomation(User user, String projectId, ProjectCreateRequestDto details) {
         try {
             log.info("프로젝트 생성 자동화 시작: {}", details.getProjectName());
+
+            //TODO: 프로젝트 트리구조를 받아서 같이 전달해줘야 함
+            Path projectPath = Paths.get(baseStoragePath, String.valueOf(user.getId()), projectId);
+            String tree = directoryTreeBuilder.build(projectPath);
 
             // 1. FastAPI 서버에 전달할 데이터 구성
             Map<String, Object> llmRequest = new HashMap<>();

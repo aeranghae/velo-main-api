@@ -1,5 +1,6 @@
 package cloud.aeranghae.main.controller;
 
+import cloud.aeranghae.main.controller.dto.ProjectCreateRequestDto;
 import cloud.aeranghae.main.controller.dto.ProjectResponseDto;
 import cloud.aeranghae.main.domain.User;
 import cloud.aeranghae.main.repository.UserRepository;
@@ -46,14 +47,17 @@ public class StorageApiController {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
 
-        String projectName = request.get("projectName"); // 리액트에서 보낸 프로젝트 이름
-        String modelName = request.get("modelName");
+        // TODO: 나중에 DTO로 받도록 수정해야 겠습니다.
+        ProjectCreateRequestDto requestDto = new ProjectCreateRequestDto();
+        requestDto.setProjectName(request.get("projectName"));
+        requestDto.setModel(request.get("model"));
+        requestDto.setFramework(request.get("framework"));
 
-        if (projectName == null || projectName.isBlank()) {
+        if (requestDto.getProjectName() == null || requestDto.getProjectName().isBlank()) {
             return ResponseEntity.badRequest().build();
         }
 
-        ProjectResponseDto newProject = storageService.createProject(user, projectName, modelName);
+        ProjectResponseDto newProject = storageService.createProject(user, requestDto);
         return ResponseEntity.ok(newProject);
     }
 
