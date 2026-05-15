@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface ProjectRepository extends JpaRepository<Project, Long> {
     List<Project> findByUserOrderByLastModifiedAtDesc(User user);
     Optional<Project> findByUuid(String uuid);
+    int countByUser(User user);
 }

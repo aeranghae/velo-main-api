@@ -50,12 +50,13 @@ public class ProjectService {
             llmRequest.put("prompt", details.getPrompt());
             llmRequest.put("framework", details.getFramework());
             llmRequest.put("language", details.getLanguage());
+            llmRequest.put("license", details.getLicense());
+            llmRequest.put("model", details.getModel());
             llmRequest.put("projectId", projectId);
+            llmRequest.put("tree", tree);
 
             // 2. FastAPI 호출 (LLM을 통해 코드 구조 생성)
             //ResponseEntity<String> response = restTemplate.postForEntity(llmServerUrl + "/generate", llmRequest, String.class);
-
-            // TODO: 호출 로그 기록을 데이터베이스에 저장해야함
 
             // 3. 받은 데이터(JSON 등)를 바탕으로 파일 생성 로직 실행
             //createFileStructures(projectId, response.getBody());

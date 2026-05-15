@@ -4,11 +4,13 @@ import cloud.aeranghae.main.controller.dto.ProjectCreateRequestDto;
 import cloud.aeranghae.main.controller.dto.ProjectResponseDto;
 import cloud.aeranghae.main.controller.dto.ProjectStatusResponseDto;
 import cloud.aeranghae.main.domain.User;
+import cloud.aeranghae.main.repository.ProjectRepository;
 import cloud.aeranghae.main.repository.UserRepository;
 import cloud.aeranghae.main.service.ProjectService;
 import cloud.aeranghae.main.service.StorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -21,6 +23,10 @@ public class ProjectApiController {
     private final StorageService storageService;
     private final ProjectService projectService;
     private final UserRepository userRepository;
+    private final ProjectRepository projectRepository;
+
+    @Value("${aeranghae.project.maxcount}")
+    private int maxProjectGenerateCount;
 
     /**
      * 프로젝트 생성 시작 엔드포인트
@@ -32,9 +38,16 @@ public class ProjectApiController {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("유저 정보를 찾을 수 없습니다."));
 
+        int projectCount = projectRepository.countByUser(user);
+        if (projectCount >= maxProjectGenerateCount) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .build();
+        }
+
         // 2. 기본 폴더 및 프로젝트 엔티티 생성 (기존 기능 활용)
         // storageService에서 UUID 기반 폴더 생성 + 기본 프레임워크 파일 추가
         ProjectResponseDto projectInfo = storageService.createProject(user, requestDto);
+
 
         // 3. 생성된 폴더 내부에 상세 데이터 기반으로 자동화 공정 시작
         // 이 단계에서 FastAPI(LLM 서버)로 framework, language, prompt 등을 전송
@@ -53,3 +66,5 @@ public class ProjectApiController {
         return ResponseEntity.ok(projectService.checkStatus(projectId));
     }
 }
+
+
