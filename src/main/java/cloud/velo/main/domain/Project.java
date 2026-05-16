@@ -7,6 +7,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Getter
@@ -17,14 +19,13 @@ public class Project {
     private Long id;
 
     @Column(nullable = false)
-    private String name; // 유저가 설정한 프로젝트 이름
+    private String name;
 
     @Column(unique = true, nullable = false, updatable = false)
-    private String uuid; // 물리 저장소 식별자 (생성 후 변경 불가)
+    private String uuid;
 
-    // 현제 프로젝트에 적용된 ai model
-    @ManyToOne(fetch = FetchType.LAZY) // 지연 로딩 권장
-    @JoinColumn(name = "ai_model_id") // DB 컬럼명
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ai_model_id")
     private AiModel model;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -34,8 +35,14 @@ public class Project {
     private LocalDateTime createdAt;
     private LocalDateTime lastModifiedAt;
 
+    // 빈 폴더와 파일을 모두 담아낼 파일 색인 노드 장부
+    // PostgreSQL 환경에서 가볍고 안전하게 경로 리스트 변동을 관리할 수 있습니다.
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "project_file_nodes", joinColumns = @JoinColumn(name = "project_id"))
+    private List<ProjectNode> fileNodes = new ArrayList<>();
+
     @Builder
-    public Project(String name, String uuid, User user,  AiModel model) {
+    public Project(String name, String uuid, User user, AiModel model) {
         this.name = name;
         this.uuid = uuid;
         this.user = user;
@@ -52,6 +59,18 @@ public class Project {
             throw new IllegalArgumentException("프로젝트 이름은 비어있을 수 없습니다.");
         }
         this.name = newName;
-        this.lastModifiedAt = LocalDateTime.now(); // 수정 시점에 시간 갱신
+        this.lastModifiedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 파일 노드 목록 전면 최신화
+     * 파일 스캔이 끝난 뒤 새로운 구조를 통째로 갈아 끼워주는 안전장치 메서드
+     */
+    public void updateFileNodes(List<ProjectNode> newNodes) {
+        this.fileNodes.clear();
+        if (newNodes != null) {
+            this.fileNodes.addAll(newNodes);
+        }
+        this.lastModifiedAt = LocalDateTime.now(); // 파일 구조 변경 시점도 수정 시간으로 갱신
     }
 }
