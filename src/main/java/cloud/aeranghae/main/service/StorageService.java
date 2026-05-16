@@ -25,10 +25,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -67,50 +64,59 @@ public class StorageService {
     public ProjectResponseDto createProject(User user, ProjectCreateRequestDto requestDto) {
         String uuid = UUID.randomUUID().toString();
 
-        // 1. 사용할 모델 결정 로직
-        AiModel targetModel = null;
+        // 1. 프레임워크 검증 먼저 (폴더 생성 전에)
+        TemplateInitializer initializer = factory.getInitializer(requestDto.getFramework());
 
-        // 전달받은 projectModel 이름이 있는 경우 조회 시도
-        if (requestDto.getModel() != null && !requestDto.getModel().trim().isEmpty()) {
-            targetModel = aiModelRepository.findByModelNameAndIsActiveTrue(requestDto.getModel())
-                    .orElse(null); // 이름으로 못 찾으면 일단 null
-        }
+        // 2. 모델 결정
+        AiModel targetModel = resolveModel(user, requestDto.getModel());
 
-        // projectModel이 없거나, DB에서 찾지 못한 경우 유저의 기본 모델 사용
-        if (targetModel == null) {
-            targetModel = user.getModel();
-        }
-
-        // [방어 코드] 만약 유저의 기본 모델조차 없다면 시스템 전체 기본 모델 조회
-        if (targetModel == null) {
-            targetModel = aiModelRepository.findByDefaultActiveTrue()
-                    .orElseThrow(() -> new IllegalStateException("사용 가능한 AI 모델이 시스템에 존재하지 않습니다."));
-        }
-
-        // 1. DB에 프로젝트 메타데이터 저장
+        // 3. DB 저장
         Project project = projectRepository.save(Project.builder()
-                .name(requestDto.getModel())
+                .name(requestDto.getProjectName())
                 .uuid(uuid)
                 .user(user)
                 .model(targetModel)
                 .build());
 
-        // TODO: 만약 프레임워크에맞는 값이 없는 경우 생성 실패 처리 및 생성된 파일 삭제
-        // 2. 물리적 폴더 생성: {baseStoragePath}/{userId}/{uuid}
+        // 4. 폴더 생성 + 템플릿 초기화
         Path projectPath = Paths.get(baseStoragePath, String.valueOf(user.getId()), uuid);
         try {
             Files.createDirectories(projectPath);
-
-            // 만약 프레임워크에맞는 값이 없는 경우 생성 실패 처리 및 생성된 파일 삭제
-            // 프레임워크에 맞는 기본 디렉토리 구조 생성
-            TemplateInitializer initializer = factory.getInitializer(requestDto.getFramework());
             initializer.initialize(projectPath, requestDto);
 
-        } catch (IOException e) {
+        } catch (Exception e) {
+            deleteDirectory(projectPath);
             throw new RuntimeException("프로젝트 폴더 생성 실패: " + uuid, e);
         }
 
         return convertToDto(project, projectPath);
+    }
+
+    // 오류 발생 시 uuid 기반 폴더 삭제
+    private void deleteDirectory(Path path) {
+        try {
+            if (Files.exists(path)) {
+                Files.walk(path)
+                        .sorted(Comparator.reverseOrder())
+                        .forEach(p -> {
+                            try { Files.delete(p); }
+                            catch (IOException ignored) {}
+                        });
+            }
+        } catch (IOException e) {
+            log.error("폴더 삭제 실패: {}", path, e);
+        }
+    }
+
+    // AI모델 선택 예외 처리
+    private AiModel resolveModel(User user, String requestModel) {
+        // 1. 요청 모델명 → 2. 유저 기본 모델 → 3. 시스템 기본 모델 순으로 탐색
+        return Optional.ofNullable(requestModel)
+                .filter(m -> !m.isBlank())
+                .flatMap(aiModelRepository::findByModelNameAndIsActiveTrue)
+                .or(() -> Optional.ofNullable(user.getModel()))
+                .or(() -> aiModelRepository.findByDefaultActiveTrue())
+                .orElseThrow(() -> new IllegalStateException("사용 가능한 AI 모델이 시스템에 존재하지 않습니다."));
     }
 
     /**
