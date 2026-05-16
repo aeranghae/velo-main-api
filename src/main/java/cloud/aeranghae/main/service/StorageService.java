@@ -95,11 +95,13 @@ public class StorageService {
                 .model(targetModel)
                 .build());
 
+        // TODO: 만약 프레임워크에맞는 값이 없는 경우 생성 실패 처리 및 생성된 파일 삭제
         // 2. 물리적 폴더 생성: {baseStoragePath}/{userId}/{uuid}
         Path projectPath = Paths.get(baseStoragePath, String.valueOf(user.getId()), uuid);
         try {
             Files.createDirectories(projectPath);
 
+            // 만약 프레임워크에맞는 값이 없는 경우 생성 실패 처리 및 생성된 파일 삭제
             // 프레임워크에 맞는 기본 디렉토리 구조 생성
             TemplateInitializer initializer = factory.getInitializer(requestDto.getFramework());
             initializer.initialize(projectPath, requestDto);
