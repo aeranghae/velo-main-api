@@ -7,6 +7,7 @@ import cloud.velo.main.domain.User;
 import cloud.velo.main.repository.UserRepository;
 import cloud.velo.main.service.StorageService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/storage")
 @RequiredArgsConstructor
@@ -64,6 +66,7 @@ public class StorageApiController {
 
         try {
             // Step 2: [컨트롤러 단계] DB 커밋이 완료되었으므로 안전하게 빈 폴더 포함 파일 색인 진행
+            log.info("NFS 색인 메서드 실행");
             storageService.indexProjectFiles(newProject.getUuid());
 
         } catch (Exception e) {
