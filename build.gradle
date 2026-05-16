@@ -4,9 +4,9 @@ plugins {
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
-group = 'cloud.aeranghae'
+group = 'cloud.velo'
 version = '0.0.3-SNAPSHOT'
-description = 'aeranghae-main'
+description = 'velo-main'
 
 java {
     toolchain {
