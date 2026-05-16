@@ -37,8 +37,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 3. 도커 빌드를 위한 로그인 (Docker Hub & GitHub Packages)
-      - name: Log in to Docker Hub
+        # 3. 도커 빌드를 위한 로그인 (Docker Hub & GitHub Packages)      - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -54,9 +53,9 @@ jobs:
       # 4. [핵심 추가] 태그명에서 앞글자 'v'를 제거하고 소문자 레포명 셋업하기
       - name: Set up clean version and lower case repo name
         run: |
-          # v1.0.0에서 v를 제외한 1.0.0만 추출하여 CLEAN_VERSION에 저장
-          echo "CLEAN_VERSION=${GITHUB_REF_NAME#v}" >> ${GITHUB_ENV}
-          echo "REPO_LC=${GITHUB_REPOSITORY,,}" >> ${GITHUB_ENV}
+          # v1.0.0에서 v를 제외한 1.0.0만 추출하여 CLEAN_VERSION에 저장  
+          echo "CLEAN_VERSION=${GITHUB_REF_NAME#v}" >> ${GITHUB_ENV}  
+          echo "REPO_LC=${GITHUB_REPOSITORY,,}" >> ${GITHUB_ENV}  
 
       # 5. 도커 이미지 빌드 후 양쪽 저장소에 동시 푸시 (v가 빠진 버전 태그 적용)
       - name: Build and push Docker images
@@ -65,7 +64,18 @@ jobs:
           context: .
           push: true
           tags: |
-            oxxultus/scripto-main:latest
-            oxxultus/scripto-main:${{ env.CLEAN_VERSION }}
-            ghcr.io/${{ env.REPO_LC }}:latest
-            ghcr.io/${{ env.REPO_LC }}:${{ env.CLEAN_VERSION }}
+            oxxultus/scripto-main:latest  
+            oxxultus/scripto-main:${{ env.CLEAN_VERSION }}  
+            ghcr.io/${{ env.REPO_LC }}:latest  
+            ghcr.io/${{ env.REPO_LC }}:${{ env.CLEAN_VERSION }}  
+
+      # 6. 미니 서버에 SSH로 원격 접속하여 쿠버네티스 팟 무중단 배포 재시작
+      - name: Deploy to Kubernetes via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: oxxultus
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: 22
+          script: |
+            kubectl rollout restart deployment/scripto-main-api
