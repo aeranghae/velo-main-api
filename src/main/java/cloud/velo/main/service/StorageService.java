@@ -288,7 +288,7 @@ public class StorageService {
                 .resolve(projectUuid)
                 .normalize();
 
-        // log.info("진짜 NFS 색인 타겟 경로: {}", projectFolderPath);
+        log.info("진짜 NFS 색인 타겟 경로: {}", projectFolderPath);
 
         try (Stream<Path> stream = Files.walk(projectFolderPath)) {
 
@@ -298,10 +298,12 @@ public class StorageService {
                     .map(path -> {
                         String relativePath = projectFolderPath.relativize(path).toString();
                         String type = Files.isDirectory(path) ? "DIR" : "FILE";
+                        System.out.println("======> 색인 중 발견된 파일: " + relativePath + " (" + type + ")"); // 강제 콘솔 출력
                         return new ProjectNode(relativePath, type);
                     })
                     .collect(Collectors.toList());
 
+            System.out.println("======> 수집 완료된 총 노드 개수: " + nodes.size()); //  확인용
             project.updateFileNodes(nodes);
             return project;
 
