@@ -42,6 +42,7 @@ public class StorageApiController {
     }
 
     // 2. 새 프로젝트 생성 (UUID 기반)
+    // 2. 새 프로젝트 생성 (UUID 기반 + 색인 실패 시 자동 롤백 완비)
     @PostMapping("/projects")
     public ResponseEntity<ProjectResponseDto> createProject(@AuthenticationPrincipal String email,
                                                             @RequestBody Map<String, String> request) {
@@ -58,7 +59,23 @@ public class StorageApiController {
             return ResponseEntity.badRequest().build();
         }
 
+        // Step 1: DB 메타데이터 저장 및 NFS 베이스 템플릿 복사 완료 (1차 트랜잭션 종료)
         ProjectResponseDto newProject = storageService.createProject(user, requestDto);
+
+        try {
+            // Step 2: [컨트롤러 단계] DB 커밋이 완료되었으므로 안전하게 빈 폴더 포함 파일 색인 진행
+            storageService.indexProjectFiles(newProject.getUuid());
+
+        } catch (Exception e) {
+            // [방어선 작동]: 디스크 색인(장부 기록) 도중 에러가 터졌다면?
+            // DB와 NFS 물리 폴더를 통째로 롤백시도
+            storageService.deleteProject(user, newProject.getUuid());
+
+            // 유저와 서버 로그에 명확한 에러 원인을 전달합니다.
+            throw new RuntimeException("프로젝트 초기 파일 색인에 실패하여 생성을 취소하고 롤백했습니다. UUID: " + newProject.getUuid(), e);
+        }
+
+        // 색인까지 무사히 완수되었을 때만 안전하게 200 OK와 함께 DTO를 리턴합니다.
         return ResponseEntity.ok(newProject);
     }
 
