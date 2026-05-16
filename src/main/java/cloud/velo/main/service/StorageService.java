@@ -1,19 +1,24 @@
 package cloud.velo.main.service;
 
 import cloud.velo.main.controller.dto.ProjectCreateRequestDto;
+import cloud.velo.main.controller.dto.ProjectNodeResponse;
 import cloud.velo.main.controller.dto.ProjectResponseDto;
 import cloud.velo.main.domain.AiModel;
 import cloud.velo.main.domain.Project;
+import cloud.velo.main.domain.ProjectNode;
 import cloud.velo.main.domain.User;
 import cloud.velo.main.repository.AiModelRepository;
 import cloud.velo.main.repository.ProjectRepository;
+import cloud.velo.main.repository.UserRepository;
 import cloud.velo.main.util.template.TemplateInitializer;
 import cloud.velo.main.util.template.TemplateInitializerFactory;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +32,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -35,10 +41,12 @@ public class StorageService {
 
     private final ProjectRepository projectRepository;
     private final AiModelRepository aiModelRepository;
+    private final UserRepository userRepository;
     private final TemplateInitializerFactory factory;
 
     @Value("${aeranghae.storage.path}")
     private String baseStoragePath;
+    private Path nfsRootPath;  // 자바 nio가 안전하게 사용할 진짜 Path 객체 변수를 선언합니다.
 
     /**
      * 사용자 루트 디렉토리 생성 (로그인 시 호출)
@@ -83,6 +91,10 @@ public class StorageService {
         try {
             Files.createDirectories(projectPath);
             initializer.initialize(projectPath, requestDto);
+
+            // 베이스 템플릿 복사(초기화) 직후, 빈 폴더 포함 전체 색인 진행
+            // 이 과정에서 엔티티 내부의 fileNodes 장부가 채워지고, 영속성 컨텍스트에 의해 DB에 함께 반영
+            this.indexProjectFiles(uuid);
 
         } catch (Exception e) {
             deleteDirectory(projectPath);
@@ -201,8 +213,9 @@ public class StorageService {
         }
     }
 
-
-    // 1. 프로젝트 이름 변경 (논리적 변경)
+    /**
+     * 프로젝트 이름 변경 (논리적 변경)
+     */
     @Transactional
     @CacheEvict(value = "projectList", key = "#user.id")
     public ProjectResponseDto updateProjectName(User user, String uuid, String newName) {
@@ -216,7 +229,9 @@ public class StorageService {
         return convertToDto(project, projectPath);
     }
 
-    // 2. 프로젝트 삭제 (DB + 물리 폴더)
+    /**
+     * 프로젝트 삭제 (DB + 물리 폴더)
+     */
     @Transactional
     @CacheEvict(value = "projectList", key = "#user.id")
     public void deleteProject(User user, String uuid) {
@@ -232,7 +247,9 @@ public class StorageService {
         deleteDirectoryRecursive(projectPath);
     }
 
-    // 폴더 내부까지 재귀적으로 삭제하는 헬퍼 메서드
+    /**
+     * 폴더 내부까지 재귀적으로 삭제하는 헬퍼 메서드
+     */
     private void deleteDirectoryRecursive(Path path) {
         if (Files.exists(path)) {
             try (var walk = Files.walk(path)) {
@@ -244,4 +261,120 @@ public class StorageService {
             }
         }
     }
+
+    /**
+     *  [스프링 라이프사이클 훅]
+     * 스프링이 켜지면서 @Value 주입을 완전히 마친 직후, 문자열을 Path 객체로 안전하게 변환
+     */
+    @PostConstruct
+    public void init() {
+        this.nfsRootPath = Paths.get(baseStoragePath).normalize();
+        log.info("StorageService 가동 - 설정된 NFS 루트 경로: {}", this.nfsRootPath);
+    }
+
+    /**
+     * 프로젝트 디렉토리 내의 모든 파일과 빈 폴더를 색인하여 DB에 저장합니다.
+     */
+    @Transactional
+    @Caching(evict = {
+            // 1. 해당 프로젝트의 파일 트리 캐시 삭제 (수정 시 트리 새로고침용)
+            @CacheEvict(value = "projectTree", key = "#projectUuid", cacheManager = "cacheManager"),
+            // 2. 메서드가 반환하는 Project 객체에서 user.id를 읽어와 유저 프로젝트 리스트 캐시 파괴 (수정 시간 반영용)
+            @CacheEvict(value = "projectList", key = "#result.user.id", cacheManager = "cacheManager")
+    })
+    public Project indexProjectFiles(String projectUuid) {
+        Path projectFolderPath = nfsRootPath.resolve(projectUuid);
+
+        Project project = projectRepository.findByUuid(projectUuid)
+                .orElseThrow(() -> new IllegalArgumentException("해당 프로젝트가 존재하지 않습니다: " + projectUuid));
+
+        try (Stream<Path> stream = Files.walk(projectFolderPath)) {
+
+            List<ProjectNode> nodes = stream
+                    .filter(path -> !path.equals(projectFolderPath))
+                    .filter(path -> !path.getFileName().toString().startsWith("."))
+                    .map(path -> {
+                        String relativePath = projectFolderPath.relativize(path).toString();
+                        String type = Files.isDirectory(path) ? "DIR" : "FILE";
+                        return new ProjectNode(relativePath, type);
+                    })
+                    .collect(Collectors.toList());
+
+            project.updateFileNodes(nodes);
+            return project;
+
+        } catch (IOException e) {
+            throw new RuntimeException("프로젝트 파일 색인에 실패했습니다.", e);
+        }
+    }
+
+
+    /**
+     * 프로젝트 파일 트리 구조 조회 (레디스 캐시 탑재)
+     */
+    @Cacheable(value = "projectTree", key = "#uuid", cacheManager = "cacheManager")
+    @Transactional(readOnly = true)
+    public List<ProjectNodeResponse> getProjectTree(String email, String uuid) {
+        // 1. 유저 및 프로젝트 검증
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("유저가 존재하지 않습니다."));
+
+        Project project = projectRepository.findByUuid(uuid)
+                .orElseThrow(() -> new IllegalArgumentException("해당 프로젝트가 존재하지 않습니다."));
+
+        // 다른 유저의 프로젝트 파일을 훔쳐보는 것을 방지하는 소유권 검증
+        if (!project.getUser().getId().equals(user.getId())) {
+            throw new SecurityException("해당 프로젝트에 접근 권한이 없습니다.");
+        }
+
+        // 2. DB 장부에 기록된 빈 폴더 + 파일 리스트를 DTO로 변환하여 리턴 (이후 캐싱됨)
+        return project.getFileNodes().stream()
+                .map(ProjectNodeResponse::new)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 특정 파일 내용 실시간 로드 (NFS I/O 담당)
+     */
+    public String getFileContent(String email, String uuid, String path) {
+        // 1. 유저 및 프로젝트 검증
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("유저가 존재하지 않습니다."));
+
+        Project project = projectRepository.findByUuid(uuid)
+                .orElseThrow(() -> new IllegalArgumentException("해당 프로젝트가 존재하지 않습니다."));
+
+        if (!project.getUser().getId().equals(user.getId())) {
+            throw new SecurityException("해당 프로젝트에 접근 권한이 없습니다.");
+        }
+
+        try {
+            // 2. 물리 저장소 절대 경로 조립 (/app/storage/userdir/{userId}/{projectUuid}/{relativePath})
+            Path rootPath = Paths.get(baseStoragePath).normalize();
+            Path targetFilePath = rootPath
+                    .resolve(String.valueOf(user.getId()))
+                    .resolve(uuid)
+                    .resolve(path)
+                    .normalize();
+
+            // 상위 디렉토리 탈출 해킹 공격(../) 방어선 구축
+            Path userProjectBoundary = rootPath.resolve(String.valueOf(user.getId())).resolve(uuid);
+            if (!targetFilePath.startsWith(userProjectBoundary)) {
+                throw new SecurityException("비정상적인 파일 접근 시도입니다.");
+            }
+
+            // 3. 파일 유효성 체크
+            if (!Files.exists(targetFilePath) || Files.isDirectory(targetFilePath)) {
+                throw new IllegalArgumentException("파일을 찾을 수 없거나 올바른 파일 포맷이 아닙니다.");
+            }
+
+            // 4. NFS 디스크에서 진짜 소스 코드 텍스트 긁어오기
+            return Files.readString(targetFilePath, java.nio.charset.StandardCharsets.UTF_8);
+
+        } catch (IOException e) {
+            log.error("NFS 파일 읽기 실패 - UUID: {}, Path: {}", uuid, path, e);
+            throw new RuntimeException("파일 시스템에서 내용을 읽어오지 못했습니다.", e);
+        }
+    }
+
 }
