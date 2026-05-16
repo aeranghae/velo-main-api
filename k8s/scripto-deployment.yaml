@@ -35,8 +35,8 @@ spec:
         - name: config-volume
           mountPath: /app/config
         
-        # 📂 중요: NFS 스토리지는 ReadWriteMany(RWX) 정책을 쓰기 때문에 
-        # 3개의 스프링 부트 팟이 동시에 같은 폴더에 파일을 읽고 써도 충돌 나지 않고 완벽히 공유됩니다.
+        # 중요: NFS 스토리지는 ReadWriteMany(RWX) 정책을 쓰기 때문에
+        # 3개의 스프링 부트 팟이 동시에 같은 폴더에 파일을 읽고 써도 충돌 나지 않고 완벽히 공유
         - name: scripto-nfs-volume
           mountPath: /app/storage
 

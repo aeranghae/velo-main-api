@@ -9,7 +9,7 @@ spec:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain  # Pod이 삭제되어도 물리 데이터는 유지하는 정책
   nfs:
-    server: 192.168.0.86  # 현재 로키 리눅스 IP
+    server: 192.168.0.86  # 현재 리눅스 IP
     path: /nfs/scripto/storage
 ---
 apiVersion: v1
