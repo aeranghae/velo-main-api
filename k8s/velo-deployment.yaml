@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
       - name: main-api
-        image: oxxultus/velo-main:latest
+        image: oxxultus/velo-main-api:latest
         imagePullPolicy: Always
         
         ports:
