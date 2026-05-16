@@ -70,8 +70,8 @@ jobs:
           push: true
           provenance: false #  GHCR 업로드 시 'unknown blob' 에러를 방지
           tags: |
-            oxxultus/velo-main:latest
-            oxxultus/velo-main:${{ env.CLEAN_VERSION }}
+            oxxultus/velo-main-api:latest
+            oxxultus/velo-main-api:${{ env.CLEAN_VERSION }}
             ghcr.io/${{ env.REPO_LC }}:latest
             ghcr.io/${{ env.REPO_LC }}:${{ env.CLEAN_VERSION }}
 
