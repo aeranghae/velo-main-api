@@ -74,9 +74,9 @@ jobs:
       - name: Deploy to Kubernetes via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.SERVER_IP }}
-          username: oxxultus
-          key: ${{ secrets.SERVER_SSH_KEY }}
+          host: ${{ secrets.REMOTE_IP }}
+          username: ${{ secrets.REMOTE_USER }}
+          password: ${{ secrets.REMOTE_PASSWORD }}
           port: 22
           script: |
             kubectl rollout restart deployment/scripto-main-api
