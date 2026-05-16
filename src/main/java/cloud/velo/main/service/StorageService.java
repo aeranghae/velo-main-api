@@ -278,10 +278,17 @@ public class StorageService {
             @CacheEvict(value = "projectList", key = "#result.user.id", cacheManager = "cacheManager")
     })
     public Project indexProjectFiles(String projectUuid) {
-        Path projectFolderPath = nfsRootPath.resolve(projectUuid);
-
+        // 1. 먼저 DB에서 프로젝트와 연관된 유저 정보를 가져옵니다.
         Project project = projectRepository.findByUuid(projectUuid)
                 .orElseThrow(() -> new IllegalArgumentException("해당 프로젝트가 존재하지 않습니다: " + projectUuid));
+
+        // 2. nfsRootPath / userId / projectUuid 순서로 안전하게 조립합니다.
+        Path projectFolderPath = nfsRootPath
+                .resolve(String.valueOf(project.getUser().getId()))
+                .resolve(projectUuid)
+                .normalize();
+
+        // log.info("진짜 NFS 색인 타겟 경로: {}", projectFolderPath);
 
         try (Stream<Path> stream = Files.walk(projectFolderPath)) {
 
@@ -299,7 +306,7 @@ public class StorageService {
             return project;
 
         } catch (IOException e) {
-            throw new RuntimeException("프로젝트 파일 색인에 실패했습니다.", e);
+            throw new RuntimeException("프로젝트 파일 색인에 실패했습니다. 경로: " + projectFolderPath, e);
         }
     }
 

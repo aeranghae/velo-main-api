@@ -67,7 +67,7 @@ public class StorageApiController {
             storageService.indexProjectFiles(newProject.getUuid());
 
         } catch (Exception e) {
-            // [방어선 작동]: 디스크 색인(장부 기록) 도중 에러가 터졌다면?
+            // [방어선 작동]: 디스크 색인(장부 기록) 도중 에러 발생시
             // DB와 NFS 물리 폴더를 통째로 롤백시도
             storageService.deleteProject(user, newProject.getUuid());
 
