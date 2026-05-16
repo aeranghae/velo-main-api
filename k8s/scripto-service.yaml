@@ -6,7 +6,7 @@ metadata:
   labels:
     app: scripto-main-service
 spec:
-  # 🌐 NodePort 방식으로 설정하여 로키 리눅스 자체 하드웨어 포트를 개방합니다.
+  # NodePort 방식으로 설정하여 로키 리눅스 자체 하드웨어 포트를 개방합니다.
   type: NodePort
   selector:
     app: scripto-main-api # 중요: deployment.yaml에 적은 레플리카 3개의 라벨과 정확히 일치해야 3대로 신호를 보냅니다.
