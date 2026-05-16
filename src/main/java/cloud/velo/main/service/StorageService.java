@@ -44,7 +44,7 @@ public class StorageService {
     private final UserRepository userRepository;
     private final TemplateInitializerFactory factory;
 
-    @Value("${aeranghae.storage.path}")
+    @Value("${velo.storage.path}")
     private String baseStoragePath;
     private Path nfsRootPath;  // 자바 nio가 안전하게 사용할 진짜 Path 객체 변수를 선언합니다.
 
@@ -91,11 +91,6 @@ public class StorageService {
         try {
             Files.createDirectories(projectPath);
             initializer.initialize(projectPath, requestDto);
-
-            // 베이스 템플릿 복사(초기화) 직후, 빈 폴더 포함 전체 색인 진행
-            // 이 과정에서 엔티티 내부의 fileNodes 장부가 채워지고, 영속성 컨텍스트에 의해 DB에 함께 반영
-            this.indexProjectFiles(uuid);
-
         } catch (Exception e) {
             deleteDirectory(projectPath);
             throw new RuntimeException("프로젝트 폴더 생성 실패: " + uuid, e);

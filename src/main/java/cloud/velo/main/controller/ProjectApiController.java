@@ -24,7 +24,7 @@ public class ProjectApiController {
     private final UserRepository userRepository;
     private final ProjectRepository projectRepository;
 
-    @Value("${aeranghae.project.maxcount}")
+    @Value("${velo.project.maxcount}")
     private int maxProjectGenerateCount;
 
     /**

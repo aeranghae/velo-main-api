@@ -29,7 +29,7 @@ public class ProjectService {
     @Value("${llm.server.url:http://localhost:8000}")
     private String llmServerUrl;
 
-    @Value("${aeranghae.storage.path}")
+    @Value("${velo.storage.path}")
     private String baseStoragePath;
 
     /**
