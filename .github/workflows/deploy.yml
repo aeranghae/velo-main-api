@@ -1,4 +1,4 @@
-name: Scripto Main API CI/CD
+name: Velo Main API CI/CD
 
 on:
   push:
