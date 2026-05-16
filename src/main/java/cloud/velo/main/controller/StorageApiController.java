@@ -1,6 +1,7 @@
 package cloud.velo.main.controller;
 
 import cloud.velo.main.controller.dto.ProjectCreateRequestDto;
+import cloud.velo.main.controller.dto.ProjectNodeResponse;
 import cloud.velo.main.controller.dto.ProjectResponseDto;
 import cloud.velo.main.domain.User;
 import cloud.velo.main.repository.UserRepository;
@@ -91,5 +92,27 @@ public class StorageApiController {
         User user = userRepository.findByEmail(email).orElseThrow();
         storageService.deleteProject(user, uuid);
         return ResponseEntity.noContent().build();
+    }
+
+    // 6. 프로젝트 파일 트리 구조 조회 (서비스 레이어 캐싱 적용)
+    // URL 예시: GET /api/storage/projects/v-uuid-123/tree
+    @GetMapping("/projects/{uuid}/tree")
+    public ResponseEntity<List<ProjectNodeResponse>> getProjectTree(@AuthenticationPrincipal String email,
+                                                                    @PathVariable String uuid) {
+        // 보안 검증을 위해 이메일 정보와 UUID를 서비스로 함께 넘깁니다.
+        List<ProjectNodeResponse> tree = storageService.getProjectTree(email, uuid);
+        return ResponseEntity.ok(tree);
+    }
+
+    // 7. 특정 파일 내용 실시간 조회
+    // URL 예시: GET /api/storage/projects/v-uuid-123/file-content?path=src/MainLogic.java
+    @GetMapping("/projects/{uuid}/file-content")
+    public ResponseEntity<String> getFileContent(@AuthenticationPrincipal String email,
+                                                 @PathVariable String uuid,
+                                                 @RequestParam String path) { // 예: src/MainLogic.java
+
+        // NFS 파일 스트림을 열어 텍스트를 긁어오는 작업도 서비스가 처리하도록 패스합니다.
+        String content = storageService.getFileContent(email, uuid, path);
+        return ResponseEntity.ok(content);
     }
 }
