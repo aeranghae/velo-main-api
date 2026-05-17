@@ -68,7 +68,7 @@ public class StorageService {
      * 새 프로젝트 생성 (DB 등록 + UUID 폴더 생성)
      */
     @Transactional
-    @CacheEvict(value = "projectList", key = "#user.id", cacheManager = "cacheManager") // 🚀 캐시 매니저 명시
+    @CacheEvict(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
     public ProjectResponseDto createProject(User user, ProjectCreateRequestDto requestDto) {
         String uuid = UUID.randomUUID().toString();
 
@@ -164,18 +164,12 @@ public class StorageService {
     }
 
     /**
-     * 특정 경로의 전체 사용량 계산 (바이트 단위)
+     * 유저의 전체 스토리지 사용량 조회 (NFS 디스크 스캔 X, DB 초고속 합산)
      */
-    public long calculateDirectorySize(Path path) {
-        if (Files.notExists(path)) return 0L;
-        try (var paths = Files.walk(path)) {
-            return paths.filter(Files::isRegularFile)
-                    .mapToLong(p -> p.toFile().length())
-                    .sum();
-        } catch (IOException e) {
-            log.error("용량 계산 중 오류 발생: {}", path, e);
-            return 0L;
-        }
+    @Transactional(readOnly = true)
+    public long getUserTotalStorageUsage(User user) {
+        // DB 에 적힌 프로젝트 용량만 합산해서 즉시 리턴합니다.
+        return projectRepository.getTotalStorageSizeByUser(user);
     }
 
     /**
@@ -187,42 +181,6 @@ public class StorageService {
             return (int) stream.filter(Files::isRegularFile).count();
         } catch (IOException e) {
             return 0;
-        }
-    }
-
-    /**
-     * [사용안함] 엔티티와 물리 정보를 DTO로 변환
-     */
-    private ProjectResponseDto convertToDto(Project project, Path path) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-        try {
-            // 물리 폴더가 없을 경우에 대비한 방어 로직
-            if (Files.notExists(path)) {
-                return ProjectResponseDto.builder()
-                        .projectName(project.getName())
-                        .uuid(project.getUuid())
-                        .model(project.getModel().getModelName())
-                        .createdAt(project.getCreatedAt().format(formatter))
-                        .lastModified("정보 없음")
-                        .size(0L)
-                        .fileCount(0)
-                        .build();
-            }
-
-            BasicFileAttributes attrs = Files.readAttributes(path, BasicFileAttributes.class);
-
-            return ProjectResponseDto.builder()
-                    .projectName(project.getName())
-                    .uuid(project.getUuid())
-                    .model(project.getModel().getModelName()) // 프로젝트 폴더 조회시 모델명은 객체가 아닌 모델 이름만 전달
-                    .createdAt(project.getCreatedAt().format(formatter))
-                    .lastModified(LocalDateTime.ofInstant(attrs.lastModifiedTime().toInstant(), ZoneId.systemDefault()).format(formatter))
-                    .size(calculateDirectorySize(path))
-                    .fileCount(getFileCount(path))
-                    .build();
-        } catch (IOException e) {
-            log.error("DTO 변환 중 파일 속성 읽기 실패: {}", project.getUuid());
-            return null;
         }
     }
 

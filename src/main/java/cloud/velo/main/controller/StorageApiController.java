@@ -29,10 +29,8 @@ public class StorageApiController {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
 
-        // 유저 PK(ID) 폴더 전체의 용량을 계산
-        long usageBytes = storageService.calculateDirectorySize(
-                java.nio.file.Paths.get(String.valueOf(user.getId())) // StorageService 내부에서 baseStoragePath와 결합됨
-        );
+        // 서비스 레이어에 만들어두신 깔끔한 비즈니스 메서드를 호출합니다.
+        long usageBytes = storageService.getUserTotalStorageUsage(user);
 
         Map<String, Object> response = new HashMap<>();
         response.put("usageBytes", usageBytes);
