@@ -46,15 +46,27 @@ public class ProjectApiController {
 
         // 2. 기본 폴더 및 프로젝트 엔티티 생성 (기존 기능 활용)
         // storageService에서 UUID 기반 폴더 생성 + 기본 프레임워크 파일 추가
-        ProjectResponseDto projectInfo = storageService.createProject(user, requestDto);
+        ProjectResponseDto newProject = storageService.createProject(user, requestDto);
 
+        try {
+            // Step 2: [컨트롤러 단계] DB 커밋이 완료되었으므로 안전하게 빈 폴더 포함 파일 색인 진행
+            storageService.indexProjectFiles(newProject.getUuid());
+
+        } catch (Exception e) {
+            // [방어선 작동]: 디스크 색인(장부 기록) 도중 에러 발생시
+            // DB와 NFS 물리 폴더를 통째로 롤백시도
+            storageService.deleteProject(user, newProject.getUuid());
+
+            // 유저와 서버 로그에 명확한 에러 원인을 전달합니다.
+            throw new RuntimeException("프로젝트 초기 파일 색인에 실패하여 생성을 취소하고 롤백했습니다. UUID: " + newProject.getUuid(), e);
+        }
 
         // 3. 생성된 폴더 내부에 상세 데이터 기반으로 자동화 공정 시작
         // 이 단계에서 FastAPI(LLM 서버)로 framework, language, prompt 등을 전송
         // 비동기라 다음 단계로 바로 넘어가게됨
         // projectService.startAutomationProcess(user, projectInfo.getUuid(), requestDto);
 
-        return ResponseEntity.ok(projectInfo);
+        return ResponseEntity.ok(newProject);
     }
 
     /**

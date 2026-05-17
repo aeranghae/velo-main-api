@@ -7,7 +7,6 @@ import cloud.velo.main.domain.User;
 import cloud.velo.main.repository.UserRepository;
 import cloud.velo.main.service.StorageService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -16,7 +15,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@Slf4j
 @RestController
 @RequestMapping("/api/storage")
 @RequiredArgsConstructor
@@ -62,17 +60,13 @@ public class StorageApiController {
         }
 
         // Step 1: DB 메타데이터 저장 및 NFS 베이스 템플릿 복사 완료 (1차 트랜잭션 종료)
-        log.info("====== [컨트롤러] Step 1 서비스 호출 직전 ======");
         ProjectResponseDto newProject = storageService.createProject(user, requestDto);
-        log.info("====== [컨트롤러] Step 1 완료! 반환된 UUID: {} ======", newProject.getUuid());
 
         try {
             // Step 2: [컨트롤러 단계] DB 커밋이 완료되었으므로 안전하게 빈 폴더 포함 파일 색인 진행
-            log.info("NFS 색인 메서드 실행");
             storageService.indexProjectFiles(newProject.getUuid());
 
         } catch (Exception e) {
-            log.error("색인 에러: ", e);
             // [방어선 작동]: 디스크 색인(장부 기록) 도중 에러 발생시
             // DB와 NFS 물리 폴더를 통째로 롤백시도
             storageService.deleteProject(user, newProject.getUuid());
