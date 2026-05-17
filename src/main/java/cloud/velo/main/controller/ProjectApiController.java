@@ -77,6 +77,8 @@ public class ProjectApiController {
      */
     @GetMapping("/{projectId}/status")
     public ResponseEntity<ProjectStatusResponseDto> getProjectStatus(@PathVariable String projectId) {
+
+
         // 프로젝트가 현재 몇 % 진행되었는지, 혹은 완료되었는지 상태 반환 - 임시코드
         return ResponseEntity.ok(projectService.checkStatus(projectId));
     }
