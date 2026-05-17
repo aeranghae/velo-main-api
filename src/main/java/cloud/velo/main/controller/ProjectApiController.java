@@ -1,5 +1,6 @@
 package cloud.velo.main.controller;
 
+import cloud.velo.main.controller.dto.FrameworkStatisticsResponse;
 import cloud.velo.main.controller.dto.ProjectCreateRequestDto;
 import cloud.velo.main.controller.dto.ProjectResponseDto;
 import cloud.velo.main.controller.dto.ProjectStatusResponseDto;
@@ -79,6 +80,7 @@ public class ProjectApiController {
         // 프로젝트가 현재 몇 % 진행되었는지, 혹은 완료되었는지 상태 반환 - 임시코드
         return ResponseEntity.ok(projectService.checkStatus(projectId));
     }
+
 }
 
 

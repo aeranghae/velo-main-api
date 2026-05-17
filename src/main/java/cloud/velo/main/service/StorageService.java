@@ -1,5 +1,6 @@
 package cloud.velo.main.service;
 
+import cloud.velo.main.controller.dto.FrameworkStatisticsResponse;
 import cloud.velo.main.controller.dto.ProjectCreateRequestDto;
 import cloud.velo.main.controller.dto.ProjectNodeResponse;
 import cloud.velo.main.controller.dto.ProjectResponseDto;
@@ -16,6 +17,8 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
@@ -43,6 +46,7 @@ public class StorageService {
     private final AiModelRepository aiModelRepository;
     private final UserRepository userRepository;
     private final TemplateInitializerFactory factory;
+    private final CacheManager cacheManager;
 
     @Value("${velo.storage.path}")
     private String baseStoragePath;
@@ -412,6 +416,42 @@ public class StorageService {
             log.error("NFS 파일 읽기 실패 - UUID: {}, Path: {}", uuid, path, e);
             throw new RuntimeException("파일 시스템에서 내용을 읽어오지 못했습니다.", e);
         }
+    }
+
+
+    /**
+     * 프레임워크 통계 반환
+     */
+    @Transactional(readOnly = true)
+    public FrameworkStatisticsResponse getFrameworkStatistics(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("유저가 존재하지 않습니다."));
+
+        // 레디스의 'projectList' 캐시 저장소에서 이 유저의 캐시 데이터 꺼내기
+        Cache cache = cacheManager.getCache("projectList");
+        List<ProjectResponseDto> cachedProjects = null;
+
+        if (cache != null) {
+            // key = "#user.id" 로 캐싱하셨으므로 user.getId()로 장부를 조회합니다.
+            cachedProjects = cache.get(user.getId(), List.class);
+        }
+
+        // 3. 만약 캐시 장부가 비어있다면 (첫 요청이거나 캐시가 만료된 경우) 어쩔 수 없이 DB 스캔 후 캐시 굽기 트리거
+        if (cachedProjects == null) {
+            // 기존에 만들어두신 캐시 메서드를 내부 호출하여 강제로 레디스에 적재하고 가져옵니다.
+            cachedProjects = getUserProjectDetails(user);
+        }
+
+        // 레디스에서 가져온 프로젝트 리스트 기반으로 스트림 집계 돌리기
+        long totalCount = cachedProjects.size();
+
+        Map<String, Long> frameworkCounts = cachedProjects.stream()
+                .collect(Collectors.groupingBy(
+                        ProjectResponseDto::getFramework,
+                        Collectors.counting()
+                ));
+
+        return new FrameworkStatisticsResponse(totalCount, frameworkCounts);
     }
 
 }

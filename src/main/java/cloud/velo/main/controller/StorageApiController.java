@@ -1,5 +1,6 @@
 package cloud.velo.main.controller;
 
+import cloud.velo.main.controller.dto.FrameworkStatisticsResponse;
 import cloud.velo.main.controller.dto.ProjectCreateRequestDto;
 import cloud.velo.main.controller.dto.ProjectNodeResponse;
 import cloud.velo.main.controller.dto.ProjectResponseDto;
@@ -125,10 +126,20 @@ public class StorageApiController {
     @GetMapping("/projects/{uuid}/file-content")
     public ResponseEntity<String> getFileContent(@AuthenticationPrincipal String email,
                                                  @PathVariable String uuid,
-                                                 @RequestParam String path) { // 예: src/MainLogic.java
-
+                                                 @RequestParam String path) {
+        // 예: src/MainLogic.java
         // NFS 파일 스트림을 열어 텍스트를 긁어오는 작업도 서비스가 처리하도록 패스합니다.
         String content = storageService.getFileContent(email, uuid, path);
         return ResponseEntity.ok(content);
     }
+
+    /**
+     * 프레임워크 통계
+     */
+    @GetMapping("/projects/framework/statistics")
+    public ResponseEntity<FrameworkStatisticsResponse> getFrameworkStatistics(@AuthenticationPrincipal String email) {
+        FrameworkStatisticsResponse stats = storageService.getFrameworkStatistics(email);
+        return ResponseEntity.ok(stats);
+    }
+
 }
