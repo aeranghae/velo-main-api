@@ -68,7 +68,7 @@ public class StorageService {
      * 새 프로젝트 생성 (DB 등록 + UUID 폴더 생성)
      */
     @Transactional
-    @CacheEvict(value = "projectList", key = "#user.id")
+    @CacheEvict(value = "projectList", key = "#user.id", cacheManager = "cacheManager") // 🚀 캐시 매니저 명시
     public ProjectResponseDto createProject(User user, ProjectCreateRequestDto requestDto) {
         String uuid = UUID.randomUUID().toString();
 
@@ -78,7 +78,7 @@ public class StorageService {
         // 2. 모델 결정
         AiModel targetModel = resolveModel(user, requestDto.getModel());
 
-        // 3. DB 저장
+        // 3. DB 저장 (엔티티 생성자 내부에서 totalSize=0L, fileCount=0으로 안전하게 초기화됨)
         Project project = projectRepository.save(Project.builder()
                 .name(requestDto.getProjectName())
                 .uuid(uuid)
@@ -96,7 +96,18 @@ public class StorageService {
             throw new RuntimeException("프로젝트 폴더 생성 실패: " + uuid, e);
         }
 
-        return convertToDto(project, projectPath);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+        // 5. 🚀 [수정] 무거운 convertToDto를 버리고 디스크 스캔 없이 0L, 0개로 DTO 즉시 조립 및 반환
+        return ProjectResponseDto.builder()
+                .projectName(project.getName())
+                .uuid(project.getUuid())
+                .model(project.getModel().getModelName())
+                .createdAt(project.getCreatedAt().format(formatter))
+                .lastModified(project.getLastModifiedAt().format(formatter))
+                .size(0L)       // 도메인 규칙에 따른 초기값 고정 (NFS I/O 제로)
+                .fileCount(0)   // 도메인 규칙에 따른 초기값 고정 (NFS I/O 제로)
+                .build();
     }
 
     // 오류 발생 시 uuid 기반 폴더 삭제
@@ -136,12 +147,19 @@ public class StorageService {
 
         if (projects.isEmpty()) return Collections.emptyList();
 
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
         return projects.stream()
-                .map(project -> {
-                    Path projectPath = Paths.get(baseStoragePath, String.valueOf(user.getId()), project.getUuid());
-                    return convertToDto(project, projectPath);
-                })
-                .filter(Objects::nonNull)
+                .map(project -> ProjectResponseDto.builder()
+                        .projectName(project.getName())
+                        .uuid(project.getUuid())
+                        .model(project.getModel().getModelName())
+                        .createdAt(project.getCreatedAt().format(formatter))
+                        // DB 컬럼에 저장해둔 최신화된 수정 시간, 용량, 파일 수를 0.0001초만에 즉시 매핑 (NFS I/O 제로)
+                        .lastModified(project.getLastModifiedAt().format(formatter))
+                        .size(project.getTotalSize())
+                        .fileCount(project.getFileCount())
+                        .build())
                 .collect(Collectors.toList());
     }
 
@@ -173,7 +191,7 @@ public class StorageService {
     }
 
     /**
-     * 엔티티와 물리 정보를 DTO로 변환
+     * [사용안함] 엔티티와 물리 정보를 DTO로 변환
      */
     private ProjectResponseDto convertToDto(Project project, Path path) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
@@ -209,19 +227,32 @@ public class StorageService {
     }
 
     /**
-     * 프로젝트 이름 변경 (논리적 변경)
+     * 프로젝트 이름 변경 (논리적 변경 - NFS 디스크 I/O 제로)
      */
     @Transactional
-    @CacheEvict(value = "projectList", key = "#user.id")
+    @CacheEvict(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
     public ProjectResponseDto updateProjectName(User user, String uuid, String newName) {
+        // 1. DB에서 프로젝트 조회 및 권한 검증
         Project project = projectRepository.findByUuid(uuid)
                 .filter(p -> p.getUser().getId().equals(user.getId())) // 본인 확인
                 .orElseThrow(() -> new IllegalArgumentException("프로젝트를 찾을 수 없거나 권한이 없습니다."));
 
-        project.updateName(newName); // 엔티티 내 비즈니스 로직 호출
+        // 2. 엔티티 이름 변경 (Dirty Checking에 의해 메서드 종료 시 DB에 반영됨)
+        project.updateName(newName);
 
-        Path projectPath = Paths.get(baseStoragePath, String.valueOf(user.getId()), uuid);
-        return convertToDto(project, projectPath);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+        // 무거운 convertToDto(NFS 디스크 스캔)를 버리고, 엔티티 컬럼 값으로 즉시 DTO 조립
+        return ProjectResponseDto.builder()
+                .projectName(project.getName())
+                .uuid(project.getUuid())
+                .model(project.getModel().getModelName())
+                .createdAt(project.getCreatedAt().format(formatter))
+                // 엔티티가 이미 들고 있는 최신화된 메타데이터를 그대로 서빙 (NFS 접근 0번)
+                .lastModified(project.getLastModifiedAt().format(formatter))
+                .size(project.getTotalSize())
+                .fileCount(project.getFileCount())
+                .build();
     }
 
     /**
@@ -268,13 +299,13 @@ public class StorageService {
     }
 
     /**
-     * 프로젝트 디렉토리 내의 모든 파일과 빈 폴더를 색인하여 DB에 저장합니다.
+     * 프로젝트 디렉토리 내의 모든 파일과 빈 폴더를 색인하여 DB에 저장하고 메타데이터를 갱신합니다.
      */
     @Transactional
     @Caching(evict = {
             // 1. 해당 프로젝트의 파일 트리 캐시 삭제 (수정 시 트리 새로고침용)
             @CacheEvict(value = "projectTree", key = "#projectUuid", cacheManager = "cacheManager"),
-            // 2. 메서드가 반환하는 Project 객체에서 user.id를 읽어와 유저 프로젝트 리스트 캐시 파괴 (수정 시간 반영용)
+            // 2. 메서드가 반환하는 Project 객체에서 user.id를 읽어와 유저 프로젝트 리스트 캐시 파괴 (용량, 개수, 수정시간 반영용)
             @CacheEvict(value = "projectList", key = "#result.user.id", cacheManager = "cacheManager")
     })
     public Project indexProjectFiles(String projectUuid) {
@@ -288,13 +319,17 @@ public class StorageService {
                 .resolve(projectUuid)
                 .normalize();
 
-        // log.info("진짜 NFS 색인 타겟 경로: {}", projectFolderPath);
-
+        // 3. Files.walk 한 번으로 트리 색인 + 용량 계산 + 파일 수 카운트를 원패스로 처리합니다.
         try (Stream<Path> stream = Files.walk(projectFolderPath)) {
 
-            List<ProjectNode> nodes = stream
+            // 디스크 스캔 결과를 메모리 리스트로 전수 수집 (NFS I/O 최소화)
+            List<Path> allPaths = stream
                     .filter(path -> !path.equals(projectFolderPath))
                     .filter(path -> !path.getFileName().toString().startsWith("."))
+                    .collect(Collectors.toList());
+
+            // 리액트 트리 뷰용 노드 데이터 조립
+            List<ProjectNode> nodes = allPaths.stream()
                     .map(path -> {
                         String relativePath = projectFolderPath.relativize(path).toString();
                         String type = Files.isDirectory(path) ? "DIR" : "FILE";
@@ -302,14 +337,29 @@ public class StorageService {
                     })
                     .collect(Collectors.toList());
 
-            project.updateFileNodes(nodes);
+            // 프로젝트 총 용량 계산 (일반 파일들의 Bytes 크기 합산)
+            long totalSize = allPaths.stream()
+                    .filter(path -> !Files.isDirectory(path))
+                    .mapToLong(path -> {
+                        try { return Files.size(path); }
+                        catch (IOException e) { return 0L; }
+                    })
+                    .sum();
+
+            // 순수 파일 개수 카운트 (디렉토리 제외)
+            int fileCount = (int) allPaths.stream()
+                    .filter(path -> !Files.isDirectory(path))
+                    .count();
+
+            // 엔티티 내부 편의 메서드를 통해 DB 실물 컬럼 일괄 업데이트!
+            project.updateStorageMeta(totalSize, fileCount, nodes);
+
             return project;
 
         } catch (IOException e) {
-            throw new RuntimeException("프로젝트 파일 색인에 실패했습니다. 경로: " + projectFolderPath, e);
+            throw new RuntimeException("프로젝트 파일 색인 및 메타데이터 갱신 실패. 경로: " + projectFolderPath, e);
         }
     }
-
 
     /**
      * 프로젝트 파일 트리 구조 조회 (레디스 캐시 탑재)

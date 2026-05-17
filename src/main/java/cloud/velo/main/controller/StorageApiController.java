@@ -42,7 +42,6 @@ public class StorageApiController {
     }
 
     // 2. 새 프로젝트 생성 (UUID 기반)
-    // 2. 새 프로젝트 생성 (UUID 기반 + 색인 실패 시 자동 롤백 완비)
     @PostMapping("/projects")
     public ResponseEntity<ProjectResponseDto> createProject(@AuthenticationPrincipal String email,
                                                             @RequestBody Map<String, String> request) {
@@ -78,7 +77,6 @@ public class StorageApiController {
         // 색인까지 무사히 완수되었을 때만 안전하게 200 OK와 함께 DTO를 리턴합니다.
         return ResponseEntity.ok(newProject);
     }
-
     // 3. 개인 저장소 내 프로젝트 폴더 리스트 반환 (상세 정보 포함)
     @GetMapping("/projects")
     public ResponseEntity<List<ProjectResponseDto>> getProjectList(@AuthenticationPrincipal String email) {

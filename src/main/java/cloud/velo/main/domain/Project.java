@@ -32,6 +32,9 @@ public class Project {
     @JoinColumn(name = "user_id")
     private User user;
 
+    private long totalSize;
+    private int fileCount;
+
     private LocalDateTime createdAt;
     private LocalDateTime lastModifiedAt;
 
@@ -49,6 +52,21 @@ public class Project {
         this.model = model;
         this.createdAt = LocalDateTime.now();
         this.lastModifiedAt = LocalDateTime.now();
+        this.totalSize = 0L;
+        this.fileCount = 0;
+    }
+
+    /**
+     * 색인 엔진이 돌아갈 때 DB 장부의 수치들을 한 번에 리프레시해 줄 편의 메서드
+     */
+    public void updateStorageMeta(long totalSize, int fileCount, List<ProjectNode> newNodes) {
+        this.totalSize = totalSize;
+        this.fileCount = fileCount;
+        this.lastModifiedAt = LocalDateTime.now(); // 파일 구조가 바뀌었으니 수정 시간도 갱신!
+
+        // 기존 값 타입 컬렉션 갱신
+        this.fileNodes.clear();
+        this.fileNodes.addAll(newNodes);
     }
 
     /**
