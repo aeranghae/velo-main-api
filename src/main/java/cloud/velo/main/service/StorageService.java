@@ -48,6 +48,9 @@ public class StorageService {
     private String baseStoragePath;
     private Path nfsRootPath;  // 자바 nio가 안전하게 사용할 진짜 Path 객체 변수를 선언합니다.
 
+    @Value("#{'${velo.ignore.directories:}'.split(',')}")
+    private List<String> ignoreDirs;
+
     /**
      * 사용자 루트 디렉토리 생성 (로그인 시 호출)
      * 경로: {baseStoragePath}/{userId}
@@ -280,10 +283,26 @@ public class StorageService {
         // 3. Files.walk 한 번으로 트리 색인 + 용량 계산 + 파일 수 카운트를 원패스로 처리합니다.
         try (Stream<Path> stream = Files.walk(projectFolderPath)) {
 
-            // 디스크 스캔 결과를 메모리 리스트로 전수 수집 (NFS I/O 최소화)
+            // 디스크 스캔 결과를 메모리 리스트로 전수 수집
             List<Path> allPaths = stream
                     .filter(path -> !path.equals(projectFolderPath))
-                    .filter(path -> !path.getFileName().toString().startsWith("."))
+                    .filter(path -> {
+                        String relativeStr = projectFolderPath.relativize(path).toString().replace("\\", "/");
+
+                        // yml 장부에 등록된 폴더명(ex: .git, .idea, node_modules) 중 하나라도 경로에 속해 있다면 탈락
+                        boolean isIgnored = ignoreDirs.stream().anyMatch(ignoreDir ->
+                                !ignoreDir.isBlank() && (
+                                        relativeStr.startsWith(ignoreDir + "/") ||
+                                                relativeStr.contains("/" + ignoreDir + "/")
+                                )
+                        );
+
+                        if (isIgnored) return false;
+
+                        // 파일명 자체가 "." 이거나 ".." 인 리눅스 시스템 폴더 기호가 아니라면 다 허용 (.gitignore 등은 생존)
+                        String fileName = path.getFileName().toString();
+                        return !fileName.equals(".") && !fileName.equals("..");
+                    })
                     .collect(Collectors.toList());
 
             // 리액트 트리 뷰용 노드 데이터 조립
@@ -309,7 +328,7 @@ public class StorageService {
                     .filter(path -> !Files.isDirectory(path))
                     .count();
 
-            // 엔티티 내부 편의 메서드를 통해 DB 실물 컬럼 일괄 업데이트!
+            // 엔티티 내부 편의 메서드를 통해 DB 실물 컬럼 일괄 업데이트! (totalSize, fileCount, fileNodes 일괄 리프레시)
             project.updateStorageMeta(totalSize, fileCount, nodes);
 
             return project;
