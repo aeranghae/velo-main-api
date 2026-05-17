@@ -85,9 +85,12 @@ public class StorageService {
         Project project = projectRepository.save(Project.builder()
                 .name(requestDto.getProjectName())
                 .uuid(uuid)
+                .framework(requestDto.getFramework())
                 .user(user)
                 .model(targetModel)
                 .build());
+
+        // TODO: [로그상태갱신] 프로젝트 데이터 저장 완료
 
         // 4. 폴더 생성 + 템플릿 초기화
         Path projectPath = Paths.get(baseStoragePath, String.valueOf(user.getId()), uuid);
@@ -99,12 +102,15 @@ public class StorageService {
             throw new RuntimeException("프로젝트 폴더 생성 실패: " + uuid, e);
         }
 
+        // TODO: [로그상태갱신] 프로젝트 생성 완료
+
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-        // 5. 🚀 [수정] 무거운 convertToDto를 버리고 디스크 스캔 없이 0L, 0개로 DTO 즉시 조립 및 반환
+        // convertToDto를 버리고 디스크 스캔 없이 0L, 0개로 DTO 즉시 조립 및 반환
         return ProjectResponseDto.builder()
                 .projectName(project.getName())
                 .uuid(project.getUuid())
+                .framework(project.getFramework())
                 .model(project.getModel().getModelName())
                 .createdAt(project.getCreatedAt().format(formatter))
                 .lastModified(project.getLastModifiedAt().format(formatter))
@@ -156,6 +162,7 @@ public class StorageService {
                 .map(project -> ProjectResponseDto.builder()
                         .projectName(project.getName())
                         .uuid(project.getUuid())
+                        .framework(project.getFramework())
                         .model(project.getModel().getModelName())
                         .createdAt(project.getCreatedAt().format(formatter))
                         // DB 컬럼에 저장해둔 최신화된 수정 시간, 용량, 파일 수를 0.0001초만에 즉시 매핑 (NFS I/O 제로)
@@ -207,6 +214,7 @@ public class StorageService {
         return ProjectResponseDto.builder()
                 .projectName(project.getName())
                 .uuid(project.getUuid())
+                .framework(project.getFramework())
                 .model(project.getModel().getModelName())
                 .createdAt(project.getCreatedAt().format(formatter))
                 // 엔티티가 이미 들고 있는 최신화된 메타데이터를 그대로 서빙 (NFS 접근 0번)

@@ -52,8 +52,10 @@ public class ProjectApiController {
             // Step 2: [컨트롤러 단계] DB 커밋이 완료되었으므로 안전하게 빈 폴더 포함 파일 색인 진행
             storageService.indexProjectFiles(newProject.getUuid());
 
+            // TODO: [로그상태갱신] 프로젝트 트리 색인 완료
+
         } catch (Exception e) {
-            // [방어선 작동]: 디스크 색인(장부 기록) 도중 에러 발생시
+            // 디스크 색인(장부 기록) 도중 에러 발생시
             // DB와 NFS 물리 폴더를 통째로 롤백시도
             storageService.deleteProject(user, newProject.getUuid());
 

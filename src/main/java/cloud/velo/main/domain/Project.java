@@ -24,6 +24,9 @@ public class Project {
     @Column(unique = true, nullable = false, updatable = false)
     private String uuid;
 
+    @Column(nullable = false)
+    private String framework;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ai_model_id")
     private AiModel model;
@@ -45,9 +48,10 @@ public class Project {
     private List<ProjectNode> fileNodes = new ArrayList<>();
 
     @Builder
-    public Project(String name, String uuid, User user, AiModel model) {
+    public Project(String name, String uuid, String framework, User user, AiModel model) {
         this.name = name;
         this.uuid = uuid;
+        this.framework = framework;
         this.user = user;
         this.model = model;
         this.createdAt = LocalDateTime.now();
@@ -90,5 +94,16 @@ public class Project {
             this.fileNodes.addAll(newNodes);
         }
         this.lastModifiedAt = LocalDateTime.now(); // 파일 구조 변경 시점도 수정 시간으로 갱신
+    }
+
+    /**
+     * 프레임워크 변경 (필요할 경우 사용)
+     */
+    public void updateFramework(String framework) {
+        if (framework == null || framework.isBlank()) {
+            throw new IllegalArgumentException("프레임워크 정보는 비어있을 수 없습니다.");
+        }
+        this.framework = framework;
+        this.lastModifiedAt = LocalDateTime.now();
     }
 }

@@ -63,6 +63,8 @@ public class StorageApiController {
             // Step 2: [컨트롤러 단계] DB 커밋이 완료되었으므로 안전하게 빈 폴더 포함 파일 색인 진행
             storageService.indexProjectFiles(newProject.getUuid());
 
+            // TODO: [로그상태갱신] 프로젝트 트리 색인 완료
+
         } catch (Exception e) {
             // [방어선 작동]: 디스크 색인(장부 기록) 도중 에러 발생시
             // DB와 NFS 물리 폴더를 통째로 롤백시도
@@ -75,6 +77,7 @@ public class StorageApiController {
         // 색인까지 무사히 완수되었을 때만 안전하게 200 OK와 함께 DTO를 리턴합니다.
         return ResponseEntity.ok(newProject);
     }
+
     // 3. 개인 저장소 내 프로젝트 폴더 리스트 반환 (상세 정보 포함)
     @GetMapping("/projects")
     public ResponseEntity<List<ProjectResponseDto>> getProjectList(@AuthenticationPrincipal String email) {
