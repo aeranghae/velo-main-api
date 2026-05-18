@@ -1,9 +1,8 @@
 package cloud.velo.main.controller;
 
-import cloud.velo.main.controller.dto.FrameworkStatisticsResponse;
 import cloud.velo.main.controller.dto.ProjectCreateRequestDto;
 import cloud.velo.main.controller.dto.ProjectResponseDto;
-import cloud.velo.main.controller.dto.ProjectStatusResponseDto;
+import cloud.velo.main.controller.dto.ProjectLogResponseDto;
 import cloud.velo.main.domain.User;
 import cloud.velo.main.repository.ProjectRepository;
 import cloud.velo.main.repository.UserRepository;
@@ -70,17 +69,6 @@ public class ProjectApiController {
         // projectService.startAutomationProcess(user, projectInfo.getUuid(), requestDto);
 
         return ResponseEntity.ok(newProject);
-    }
-
-    /**
-     * 프로젝트 생성 상태 조회 (SSE 또는 폴링 방식 대비)
-     */
-    @GetMapping("/{projectId}/status")
-    public ResponseEntity<ProjectStatusResponseDto> getProjectStatus(@PathVariable String projectId) {
-
-
-        // 프로젝트가 현재 몇 % 진행되었는지, 혹은 완료되었는지 상태 반환 - 임시코드
-        return ResponseEntity.ok(projectService.checkStatus(projectId));
     }
 
 }
