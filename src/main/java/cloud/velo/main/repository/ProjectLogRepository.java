@@ -12,7 +12,7 @@ import java.util.List;
 public interface ProjectLogRepository extends JpaRepository<ProjectLog, Long> {
 
     /**
-     * 💡 [정밀 수정] 기껏 획득한 고유 '사용자 ID'와 '프로젝트 ID' 숫자를 기준으로 로그 테이블을 초고속 정밀 타격합니다.
+     * 고유 '사용자 ID(user_id)'와 '프로젝트 ID(project_id)' 숫자를 기준으로 로그 테이블을 매핑합니다.
      */
     @Query("SELECT pl FROM ProjectLog pl WHERE pl.user.id = :userId AND pl.project.id = :projectId ORDER BY pl.id ASC")
     List<ProjectLog> findLogsByUserIdAndProjectId(@Param("userId") Long userId, @Param("projectId") Long projectId);

@@ -13,7 +13,6 @@ import java.util.List;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "project")
 public class Project {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -22,63 +21,70 @@ public class Project {
     @Column(nullable = false)
     private String name;
 
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
     @Column(unique = true, nullable = false, updatable = false)
     private String uuid;
 
     @Column(nullable = false)
     private String framework;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
-    private User user;
+    // 현재 진행 상황을 나타내는 필드
+    @Column(nullable = false)
+    private String status;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ai_model_id")
     private AiModel model;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+
     private long totalSize;
     private int fileCount;
-
-    // 💡 1. 여기에 status 필드를 추가해야 project.getStatus()를 호출할 수 있습니다.
-    @Column(nullable = false)
-    private String status;
 
     private LocalDateTime createdAt;
     private LocalDateTime lastModifiedAt;
 
+    // 빈 폴더와 파일을 모두 담아낼 파일 색인 노드 장부
+    // PostgreSQL 환경에서 가볍고 안전하게 경로 리스트 변동을 관리할 수 있습니다.
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "project_file_nodes", joinColumns = @JoinColumn(name = "project_id"))
     private List<ProjectNode> fileNodes = new ArrayList<>();
 
-    // 💡 2. 빌더 생성자 파라미터에 String status를 추가해야 StorageService의 빌더가 작동합니다.
     @Builder
-    public Project(String name, String uuid, String framework, User user, AiModel model, String status) {
+    public Project(String name, String description, String uuid, String framework, User user, AiModel model) {
         this.name = name;
+        this.description = description;
         this.uuid = uuid;
         this.framework = framework;
         this.user = user;
         this.model = model;
-        this.status = (status != null) ? status : "GENERATING"; // 기본값 방어
+        this.status = "Created"; // 프로젝트를 처음 만들었을때 default
         this.createdAt = LocalDateTime.now();
         this.lastModifiedAt = LocalDateTime.now();
         this.totalSize = 0L;
         this.fileCount = 0;
     }
 
-    // 💡 3. 여기에 이 메서드가 있어야 수신 웹훅에서 project.updateStatus(...)를 호출할 수 있습니다.
-    public void updateStatus(String newStatus) {
-        this.status = newStatus;
-        this.lastModifiedAt = LocalDateTime.now(); // 상태 변경 시 수정 시간도 갱신!
-    }
-
+    /**
+     * 색인 엔진이 돌아갈 때 DB 장부의 수치들을 한 번에 리프레시해 줄 편의 메서드
+     */
     public void updateStorageMeta(long totalSize, int fileCount, List<ProjectNode> newNodes) {
         this.totalSize = totalSize;
         this.fileCount = fileCount;
-        this.lastModifiedAt = LocalDateTime.now();
+        this.lastModifiedAt = LocalDateTime.now(); // 파일 구조가 바뀌었으니 수정 시간도 갱신!
+
+        // 기존 값 타입 컬렉션 갱신
         this.fileNodes.clear();
         this.fileNodes.addAll(newNodes);
     }
 
+    /**
+     * 비즈니스 로직: 프로젝트 이름 변경
+     */
     public void updateName(String newName) {
         if (newName == null || newName.isBlank()) {
             throw new IllegalArgumentException("프로젝트 이름은 비어있을 수 없습니다.");
@@ -87,19 +93,43 @@ public class Project {
         this.lastModifiedAt = LocalDateTime.now();
     }
 
+    /**
+     * 비즈니스 로직: 프로젝트 설명만 단독 변경 (필요 시 사용)
+     */
+    public void updateDescription(String newDescription) {
+        this.description = newDescription;
+        this.lastModifiedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 파일 노드 목록 전면 최신화
+     * 파일 스캔이 끝난 뒤 새로운 구조를 통째로 갈아 끼워주는 안전장치 메서드
+     */
     public void updateFileNodes(List<ProjectNode> newNodes) {
         this.fileNodes.clear();
         if (newNodes != null) {
             this.fileNodes.addAll(newNodes);
         }
-        this.lastModifiedAt = LocalDateTime.now();
+        this.lastModifiedAt = LocalDateTime.now(); // 파일 구조 변경 시점도 수정 시간으로 갱신
     }
 
+    /**
+     * 프레임워크 변경 (필요할 경우 사용)
+     */
     public void updateFramework(String framework) {
         if (framework == null || framework.isBlank()) {
             throw new IllegalArgumentException("프레임워크 정보는 비어있을 수 없습니다.");
         }
         this.framework = framework;
+        this.lastModifiedAt = LocalDateTime.now();
+    }
+
+    // ProjectService에서 작업이 끝나거나 실패했을때 상태를 바꿈
+    public void updateStatus(String status) {
+        if (status == null || status.isBlank()) {
+            throw new IllegalArgumentException("상태 정보는 비어있을 수 없습니다.");
+        }
+        this.status = status;
         this.lastModifiedAt = LocalDateTime.now();
     }
 }
