@@ -1,4 +1,4 @@
-package cloud.velo.main.util.template.initializer;
+package cloud.velo.main.util.template.initializer.framework;
 
 import cloud.velo.main.controller.dto.ProjectCreateRequestDto;
 import cloud.velo.main.util.template.BaseTemplateInitializer;
@@ -14,7 +14,7 @@ public class NestJsTemplateInitializer extends BaseTemplateInitializer {
     public String getSupportedFramework() { return "nestjs"; }
 
     @Override
-    public void initialize(Path rootPath, ProjectCreateRequestDto dto) {
+    public void initTemplate(Path rootPath, ProjectCreateRequestDto dto) {
         String projectName = dto.getProjectName().toLowerCase();
 
         createDirectories(rootPath, List.of(
