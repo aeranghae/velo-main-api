@@ -24,22 +24,7 @@ public class StorageApiController {
     private final StorageService storageService;
     private final UserRepository userRepository;
 
-    // 1. 개인 저장소 사용량 반환
-    @GetMapping("/usage")
-    public ResponseEntity<Map<String, Object>> getUsage(@AuthenticationPrincipal String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
-
-        // 서비스 레이어에 만들어두신 깔끔한 비즈니스 메서드를 호출합니다.
-        long usageBytes = storageService.getUserTotalStorageUsage(user);
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("usageBytes", usageBytes);
-        response.put("usageMB", String.format("%.2f", (double) usageBytes / (1024 * 1024)));
-
-        return ResponseEntity.ok(response);
-    }
-
+    // 생성 - - - - - - - - - - - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // 2. 새 프로젝트 생성 (UUID 기반)
     @PostMapping("/projects")
     public ResponseEntity<ProjectResponseDto> createProject(@AuthenticationPrincipal String email,
@@ -79,7 +64,24 @@ public class StorageApiController {
         return ResponseEntity.ok(newProject);
     }
 
-    // 3. 개인 저장소 내 프로젝트 폴더 리스트 반환 (상세 정보 포함)
+    // 조회 - - - - - - - - - - - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    // 개인 저장소 사용량 반환
+    @GetMapping("/usage")
+    public ResponseEntity<Map<String, Object>> getUsage(@AuthenticationPrincipal String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
+
+        // 서비스 레이어에 만들어두신 깔끔한 비즈니스 메서드를 호출합니다.
+        long usageBytes = storageService.getUserTotalStorageUsage(user);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("usageBytes", usageBytes);
+        response.put("usageMB", String.format("%.2f", (double) usageBytes / (1024 * 1024)));
+
+        return ResponseEntity.ok(response);
+    }
+
+    // 개인 저장소 내 프로젝트 폴더 리스트 반환 (상세 정보 포함)
     @GetMapping("/projects")
     public ResponseEntity<List<ProjectResponseDto>> getProjectList(@AuthenticationPrincipal String email) {
         User user = userRepository.findByEmail(email)
@@ -91,27 +93,7 @@ public class StorageApiController {
         return ResponseEntity.ok(projects);
     }
 
-    // 4. 프로젝트 이름 변경
-    @PatchMapping("/projects/{uuid}")
-    public ResponseEntity<ProjectResponseDto> updateProject(@AuthenticationPrincipal String email,
-                                                            @PathVariable String uuid,
-                                                            @RequestBody Map<String, String> request) {
-        User user = userRepository.findByEmail(email).orElseThrow();
-        String newName = request.get("newName");
-
-        return ResponseEntity.ok(storageService.updateProjectName(user, uuid, newName));
-    }
-
-    // 5. 프로젝트 삭제
-    @DeleteMapping("/projects/{uuid}")
-    public ResponseEntity<Void> deleteProject(@AuthenticationPrincipal String email,
-                                              @PathVariable String uuid) {
-        User user = userRepository.findByEmail(email).orElseThrow();
-        storageService.deleteProject(user, uuid);
-        return ResponseEntity.noContent().build();
-    }
-
-    // 6. 프로젝트 파일 트리 구조 조회 (서비스 레이어 캐싱 적용)
+    // 프로젝트 파일 트리 구조 조회
     // URL 예시: GET /api/storage/projects/v-uuid-123/tree
     @GetMapping("/projects/{uuid}/tree")
     public ResponseEntity<List<ProjectNodeResponse>> getProjectTree(@AuthenticationPrincipal String email,
@@ -121,7 +103,7 @@ public class StorageApiController {
         return ResponseEntity.ok(tree);
     }
 
-    // 7. 특정 파일 내용 실시간 조회
+    // 특정 파일 내용 실시간 조회
     // URL 예시: GET /api/storage/projects/v-uuid-123/file-content?path=src/MainLogic.java
     @GetMapping("/projects/{uuid}/file-content")
     public ResponseEntity<String> getFileContent(@AuthenticationPrincipal String email,
@@ -133,9 +115,7 @@ public class StorageApiController {
         return ResponseEntity.ok(content);
     }
 
-    /**
-     * 프레임워크 통계
-     */
+    // 프레임워크 통계
     @GetMapping("/projects/framework/statistics")
     public ResponseEntity<FrameworkStatisticsResponse> getFrameworkStatistics(@AuthenticationPrincipal String email) {
         FrameworkStatisticsResponse stats = storageService.getFrameworkStatistics(email);
@@ -144,8 +124,8 @@ public class StorageApiController {
 
 
 
+    // 수정 - - - - - - - - - - - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // 프로젝트 설명 변경
-    // 5. 프로젝트 설명 변경
     @PatchMapping("/projects/{uuid}/description")
     public ResponseEntity<ProjectResponseDto> updateProjectDescription(@AuthenticationPrincipal String email,
                                                                        @PathVariable String uuid,
@@ -154,5 +134,25 @@ public class StorageApiController {
         String description = request.get("description");
 
         return ResponseEntity.ok(storageService.updateProjectDescription(user, uuid, description));
+    }
+
+    // 프로젝트 이름 변경
+    @PatchMapping("/projects/{uuid}")
+    public ResponseEntity<ProjectResponseDto> updateProject(@AuthenticationPrincipal String email,
+                                                            @PathVariable String uuid,
+                                                            @RequestBody Map<String, String> request) {
+        User user = userRepository.findByEmail(email).orElseThrow();
+        String newName = request.get("newName");
+
+        return ResponseEntity.ok(storageService.updateProjectName(user, uuid, newName));
+    }
+
+    // 프로젝트 삭제
+    @DeleteMapping("/projects/{uuid}")
+    public ResponseEntity<Void> deleteProject(@AuthenticationPrincipal String email,
+                                              @PathVariable String uuid) {
+        User user = userRepository.findByEmail(email).orElseThrow();
+        storageService.deleteProject(user, uuid);
+        return ResponseEntity.noContent().build();
     }
 }

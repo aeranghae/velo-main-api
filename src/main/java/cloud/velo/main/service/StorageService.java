@@ -56,6 +56,18 @@ public class StorageService {
     private List<String> ignoreDirs;
 
     /**
+     *  [스프링 라이프사이클 훅]
+     * 스프링이 켜지면서 @Value 주입을 완전히 마친 직후, 문자열을 Path 객체로 안전하게 변환
+     */
+    @PostConstruct
+    public void init() {
+        this.nfsRootPath = Paths.get(baseStoragePath).normalize();
+        log.info("StorageService 가동 - 설정된 NFS 루트 경로: {}", this.nfsRootPath);
+    }
+
+    // 생성 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    /**
      * 사용자 루트 디렉토리 생성 (로그인 시 호출)
      * 경로: {baseStoragePath}/{userId}
      */
@@ -125,80 +137,34 @@ public class StorageService {
                 .build();
     }
 
-    // 오류 발생 시 uuid 기반 폴더 삭제
-    private void deleteDirectory(Path path) {
-        try {
-            if (Files.exists(path)) {
-                Files.walk(path)
-                        .sorted(Comparator.reverseOrder())
-                        .forEach(p -> {
-                            try { Files.delete(p); }
-                            catch (IOException ignored) {}
-                        });
-            }
-        } catch (IOException e) {
-            log.error("폴더 삭제 실패: {}", path, e);
-        }
-    }
-
-    // AI모델 선택 예외 처리
-    private AiModel resolveModel(User user, String requestModel) {
-        // 1. 요청 모델명 → 2. 유저 기본 모델 → 3. 시스템 기본 모델 순으로 탐색
-        return Optional.ofNullable(requestModel)
-                .filter(m -> !m.isBlank())
-                .flatMap(aiModelRepository::findByModelNameAndIsActiveTrue)
-                .or(() -> Optional.ofNullable(user.getModel()))
-                .or(() -> aiModelRepository.findByDefaultActiveTrue())
-                .orElseThrow(() -> new IllegalStateException("사용 가능한 AI 모델이 시스템에 존재하지 않습니다."));
-    }
-
     /**
-     * 사용자 프로젝트 상세 목록 조회 (DB 정보 + 물리적 통계)
+     * 프로젝트 설명 변경
      */
-    @Transactional(readOnly = true)
-    @Cacheable(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
-    public List<ProjectResponseDto> getUserProjectDetails(User user) {
-        List<Project> projects = projectRepository.findByUserOrderByLastModifiedAtDesc(user);
+    @Transactional
+    @CacheEvict(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
+    public ProjectResponseDto updateProjectDescription(User user, String uuid, String description) {
 
-        if (projects.isEmpty()) return Collections.emptyList();
+        // 1. URL로 들어온 uuid와 인증된 유저 정보로 프로젝트 검증 및 조회
+        Project project = projectRepository.findByUuidAndUser(uuid, user)
+                .orElseThrow(() -> new IllegalArgumentException("해당 프로젝트를 찾을 수 없거나 수정 권한이 없습니다."));
 
+        // 2. 설명 단독 변경 (내부에서 수정 시간 반영)
+        project.updateDescription(description);
+
+        // 3. 기존 규칙대로 NFS 디스크 스캔 없이 DB 데이터로만 즉시 DTO 조립 및 반환
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-        return projects.stream()
-                .map(project -> ProjectResponseDto.builder()
-                        .projectName(project.getName())
-                        .description(project.getDescription())
-                        .uuid(project.getUuid())
-                        .framework(project.getFramework())
-                        .model(project.getModel().getModelName())
-                        .createdAt(project.getCreatedAt().format(formatter))
-                        // DB 컬럼에 저장해둔 최신화된 수정 시간, 용량, 파일 수를 0.0001초만에 즉시 매핑 (NFS I/O 제로)
-                        .lastModified(project.getLastModifiedAt().format(formatter))
-                        .size(project.getTotalSize())
-                        .fileCount(project.getFileCount())
-                        .build())
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * 유저의 전체 스토리지 사용량 조회 (NFS 디스크 스캔 X, DB 초고속 합산)
-     */
-    @Transactional(readOnly = true)
-    public long getUserTotalStorageUsage(User user) {
-        // DB 에 적힌 프로젝트 용량만 합산해서 즉시 리턴합니다.
-        return projectRepository.getTotalStorageSizeByUser(user);
-    }
-
-    /**
-     * 폴더 내 일반 파일 개수 카운트
-     */
-    private int getFileCount(Path path) {
-        if (Files.notExists(path)) return 0;
-        try (var stream = Files.walk(path)) {
-            return (int) stream.filter(Files::isRegularFile).count();
-        } catch (IOException e) {
-            return 0;
-        }
+        return ProjectResponseDto.builder()
+                .projectName(project.getName())
+                .description(project.getDescription())
+                .uuid(project.getUuid())
+                .framework(project.getFramework())
+                .model(project.getModel().getModelName())
+                .createdAt(project.getCreatedAt().format(formatter))
+                .lastModified(project.getLastModifiedAt().format(formatter))
+                .size(project.getTotalSize())
+                .fileCount(project.getFileCount())
+                .build();
     }
 
     /**
@@ -250,29 +216,46 @@ public class StorageService {
         deleteDirectoryRecursive(projectPath);
     }
 
+    // 조회 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
     /**
-     * 폴더 내부까지 재귀적으로 삭제하는 헬퍼 메서드
+     * 사용자 프로젝트 상세 목록 조회 (DB 정보 + 물리적 통계)
      */
-    private void deleteDirectoryRecursive(Path path) {
-        if (Files.exists(path)) {
-            try (var walk = Files.walk(path)) {
-                walk.sorted(java.util.Comparator.reverseOrder()) // 하위 파일부터 삭제
-                        .map(Path::toFile)
-                        .forEach(java.io.File::delete);
-            } catch (IOException e) {
-                throw new RuntimeException("물리적 폴더 삭제 실패: " + path, e);
-            }
-        }
+    @Transactional(readOnly = true)
+    @Cacheable(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
+    public List<ProjectResponseDto> getUserProjectDetails(User user) {
+        List<Project> projects = projectRepository.findByUserOrderByLastModifiedAtDesc(user);
+
+        if (projects.isEmpty()) return Collections.emptyList();
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+        return projects.stream()
+                .map(project -> ProjectResponseDto.builder()
+                        .projectName(project.getName())
+                        .description(project.getDescription())
+                        .uuid(project.getUuid())
+                        .framework(project.getFramework())
+                        .model(project.getModel().getModelName())
+                        .createdAt(project.getCreatedAt().format(formatter))
+                        // DB 컬럼에 저장해둔 최신화된 수정 시간, 용량, 파일 수를 0.0001초만에 즉시 매핑 (NFS I/O 제로)
+                        .lastModified(project.getLastModifiedAt().format(formatter))
+                        .size(project.getTotalSize())
+                        .fileCount(project.getFileCount())
+                        .build())
+                .collect(Collectors.toList());
     }
 
     /**
-     *  [스프링 라이프사이클 훅]
-     * 스프링이 켜지면서 @Value 주입을 완전히 마친 직후, 문자열을 Path 객체로 안전하게 변환
+     * 폴더 내 일반 파일 개수 카운트
      */
-    @PostConstruct
-    public void init() {
-        this.nfsRootPath = Paths.get(baseStoragePath).normalize();
-        log.info("StorageService 가동 - 설정된 NFS 루트 경로: {}", this.nfsRootPath);
+    private int getFileCount(Path path) {
+        if (Files.notExists(path)) return 0;
+        try (var stream = Files.walk(path)) {
+            return (int) stream.filter(Files::isRegularFile).count();
+        } catch (IOException e) {
+            return 0;
+        }
     }
 
     /**
@@ -422,7 +405,6 @@ public class StorageService {
         }
     }
 
-
     /**
      * 프레임워크 통계 반환
      */
@@ -458,33 +440,55 @@ public class StorageService {
         return new FrameworkStatisticsResponse(totalCount, frameworkCounts);
     }
 
+    /**
+     * 유저의 전체 스토리지 사용량 조회 (NFS 디스크 스캔 X, DB 초고속 합산)
+     */
+    @Transactional(readOnly = true)
+    public long getUserTotalStorageUsage(User user) {
+        // DB 에 적힌 프로젝트 용량만 합산해서 즉시 리턴합니다.
+        return projectRepository.getTotalStorageSizeByUser(user);
+    }
 
-    // 프로젝트 설명 변경
-    @Transactional
-    @CacheEvict(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
-    public ProjectResponseDto updateProjectDescription(User user, String uuid, String description) {
+    // 헬퍼 메서드  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-        // 1. URL로 들어온 uuid와 인증된 유저 정보로 프로젝트 검증 및 조회
-        Project project = projectRepository.findByUuidAndUser(uuid, user)
-                .orElseThrow(() -> new IllegalArgumentException("해당 프로젝트를 찾을 수 없거나 수정 권한이 없습니다."));
+    // 폴더 내부까지 재귀적으로 삭제하는 헬퍼 메서드
+    private void deleteDirectoryRecursive(Path path) {
+        if (Files.exists(path)) {
+            try (var walk = Files.walk(path)) {
+                walk.sorted(java.util.Comparator.reverseOrder()) // 하위 파일부터 삭제
+                        .map(Path::toFile)
+                        .forEach(java.io.File::delete);
+            } catch (IOException e) {
+                throw new RuntimeException("물리적 폴더 삭제 실패: " + path, e);
+            }
+        }
+    }
 
-        // 2. 설명 단독 변경 (내부에서 수정 시간 반영)
-        project.updateDescription(description);
+    // 오류 발생 시 uuid 기반 폴더 삭제
+    private void deleteDirectory(Path path) {
+        try {
+            if (Files.exists(path)) {
+                Files.walk(path)
+                        .sorted(Comparator.reverseOrder())
+                        .forEach(p -> {
+                            try { Files.delete(p); }
+                            catch (IOException ignored) {}
+                        });
+            }
+        } catch (IOException e) {
+            log.error("폴더 삭제 실패: {}", path, e);
+        }
+    }
 
-        // 3. 기존 규칙대로 NFS 디스크 스캔 없이 DB 데이터로만 즉시 DTO 조립 및 반환
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-
-        return ProjectResponseDto.builder()
-                .projectName(project.getName())
-                .description(project.getDescription())
-                .uuid(project.getUuid())
-                .framework(project.getFramework())
-                .model(project.getModel().getModelName())
-                .createdAt(project.getCreatedAt().format(formatter))
-                .lastModified(project.getLastModifiedAt().format(formatter))
-                .size(project.getTotalSize())
-                .fileCount(project.getFileCount())
-                .build();
+    // AI모델 선택 예외 처리
+    private AiModel resolveModel(User user, String requestModel) {
+        // 1. 요청 모델명 → 2. 유저 기본 모델 → 3. 시스템 기본 모델 순으로 탐색
+        return Optional.ofNullable(requestModel)
+                .filter(m -> !m.isBlank())
+                .flatMap(aiModelRepository::findByModelNameAndIsActiveTrue)
+                .or(() -> Optional.ofNullable(user.getModel()))
+                .or(() -> aiModelRepository.findByDefaultActiveTrue())
+                .orElseThrow(() -> new IllegalStateException("사용 가능한 AI 모델이 시스템에 존재하지 않습니다."));
     }
 
 }
