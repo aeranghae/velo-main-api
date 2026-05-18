@@ -26,7 +26,7 @@ public class ProjectLogService {
     private final UserRepository userRepository;
     private final ProjectLogRepository projectLogRepository;
 
-    // 💡 기존 RedisConfig에 잡혀있는 템플릿을 그대로 주입받아 사용합니다.
+    // 기존 RedisConfig에 잡혀있는 템플릿을 그대로 주입받아 사용합니다.
     private final RedisTemplate<String, Object> redisTemplate;
 
     /**

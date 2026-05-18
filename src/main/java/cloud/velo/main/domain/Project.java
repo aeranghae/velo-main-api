@@ -13,7 +13,6 @@ import java.util.List;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "project")
 public class Project {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -31,6 +30,10 @@ public class Project {
     @Column(nullable = false)
     private String framework;
 
+    // 현재 진행 상황을 나타내는 필드
+    @Column(nullable = false)
+    private String status;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ai_model_id")
     private AiModel model;
@@ -41,10 +44,6 @@ public class Project {
 
     private long totalSize;
     private int fileCount;
-
-    // 💡 1. 여기에 status 필드를 추가해야 project.getStatus()를 호출할 수 있습니다.
-    @Column(nullable = false)
-    private String status;
 
     private LocalDateTime createdAt;
     private LocalDateTime lastModifiedAt;
@@ -63,19 +62,16 @@ public class Project {
         this.framework = framework;
         this.user = user;
         this.model = model;
-        this.status = (status != null) ? status : "GENERATING"; // 기본값 방어
+        this.status = "Created"; // 프로젝트를 처음 만들었을때 default
         this.createdAt = LocalDateTime.now();
         this.lastModifiedAt = LocalDateTime.now();
         this.totalSize = 0L;
         this.fileCount = 0;
     }
 
-    // 💡 3. 여기에 이 메서드가 있어야 수신 웹훅에서 project.updateStatus(...)를 호출할 수 있습니다.
-    public void updateStatus(String newStatus) {
-        this.status = newStatus;
-        this.lastModifiedAt = LocalDateTime.now(); // 상태 변경 시 수정 시간도 갱신!
-    }
-
+    /**
+     * 색인 엔진이 돌아갈 때 DB 장부의 수치들을 한 번에 리프레시해 줄 편의 메서드
+     */
     public void updateStorageMeta(long totalSize, int fileCount, List<ProjectNode> newNodes) {
         this.totalSize = totalSize;
         this.fileCount = fileCount;
@@ -125,6 +121,15 @@ public class Project {
             throw new IllegalArgumentException("프레임워크 정보는 비어있을 수 없습니다.");
         }
         this.framework = framework;
+        this.lastModifiedAt = LocalDateTime.now();
+    }
+
+    // ProjectService에서 작업이 끝나거나 실패했을때 상태를 바꿈
+    public void updateStatus(String status) {
+        if (status == null || status.isBlank()) {
+            throw new IllegalArgumentException("상태 정보는 비어있을 수 없습니다.");
+        }
+        this.status = status;
         this.lastModifiedAt = LocalDateTime.now();
     }
 }
