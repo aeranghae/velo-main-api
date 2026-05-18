@@ -88,6 +88,7 @@ public class StorageService {
         // 3. DB 저장 (엔티티 생성자 내부에서 totalSize=0L, fileCount=0으로 안전하게 초기화됨)
         Project project = projectRepository.save(Project.builder()
                 .name(requestDto.getProjectName())
+                .description("")
                 .uuid(uuid)
                 .framework(requestDto.getFramework())
                 .user(user)
@@ -113,6 +114,7 @@ public class StorageService {
         // convertToDto를 버리고 디스크 스캔 없이 0L, 0개로 DTO 즉시 조립 및 반환
         return ProjectResponseDto.builder()
                 .projectName(project.getName())
+                .description(project.getDescription())
                 .uuid(project.getUuid())
                 .framework(project.getFramework())
                 .model(project.getModel().getModelName())
@@ -165,6 +167,7 @@ public class StorageService {
         return projects.stream()
                 .map(project -> ProjectResponseDto.builder()
                         .projectName(project.getName())
+                        .description(project.getDescription())
                         .uuid(project.getUuid())
                         .framework(project.getFramework())
                         .model(project.getModel().getModelName())
@@ -217,6 +220,7 @@ public class StorageService {
         // 무거운 convertToDto(NFS 디스크 스캔)를 버리고, 엔티티 컬럼 값으로 즉시 DTO 조립
         return ProjectResponseDto.builder()
                 .projectName(project.getName())
+                .description(project.getDescription())
                 .uuid(project.getUuid())
                 .framework(project.getFramework())
                 .model(project.getModel().getModelName())
@@ -454,5 +458,33 @@ public class StorageService {
         return new FrameworkStatisticsResponse(totalCount, frameworkCounts);
     }
 
+
+    // 프로젝트 설명 변경
+    @Transactional
+    @CacheEvict(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
+    public ProjectResponseDto updateProjectDescription(User user, String uuid, String description) {
+
+        // 1. URL로 들어온 uuid와 인증된 유저 정보로 프로젝트 검증 및 조회
+        Project project = projectRepository.findByUuidAndUser(uuid, user)
+                .orElseThrow(() -> new IllegalArgumentException("해당 프로젝트를 찾을 수 없거나 수정 권한이 없습니다."));
+
+        // 2. 설명 단독 변경 (내부에서 수정 시간 반영)
+        project.updateDescription(description);
+
+        // 3. 기존 규칙대로 NFS 디스크 스캔 없이 DB 데이터로만 즉시 DTO 조립 및 반환
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+        return ProjectResponseDto.builder()
+                .projectName(project.getName())
+                .description(project.getDescription())
+                .uuid(project.getUuid())
+                .framework(project.getFramework())
+                .model(project.getModel().getModelName())
+                .createdAt(project.getCreatedAt().format(formatter))
+                .lastModified(project.getLastModifiedAt().format(formatter))
+                .size(project.getTotalSize())
+                .fileCount(project.getFileCount())
+                .build();
+    }
 
 }

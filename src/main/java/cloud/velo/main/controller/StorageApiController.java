@@ -142,4 +142,17 @@ public class StorageApiController {
         return ResponseEntity.ok(stats);
     }
 
+
+
+    // 프로젝트 설명 변경
+    // 5. 프로젝트 설명 변경
+    @PatchMapping("/projects/{uuid}/description")
+    public ResponseEntity<ProjectResponseDto> updateProjectDescription(@AuthenticationPrincipal String email,
+                                                                       @PathVariable String uuid,
+                                                                       @RequestBody Map<String, String> request) {
+        User user = userRepository.findByEmail(email).orElseThrow();
+        String description = request.get("description");
+
+        return ResponseEntity.ok(storageService.updateProjectDescription(user, uuid, description));
+    }
 }

@@ -21,6 +21,9 @@ public class Project {
     @Column(nullable = false)
     private String name;
 
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
     @Column(unique = true, nullable = false, updatable = false)
     private String uuid;
 
@@ -48,8 +51,9 @@ public class Project {
     private List<ProjectNode> fileNodes = new ArrayList<>();
 
     @Builder
-    public Project(String name, String uuid, String framework, User user, AiModel model) {
+    public Project(String name, String description, String uuid, String framework, User user, AiModel model) {
         this.name = name;
+        this.description = description;
         this.uuid = uuid;
         this.framework = framework;
         this.user = user;
@@ -81,6 +85,14 @@ public class Project {
             throw new IllegalArgumentException("프로젝트 이름은 비어있을 수 없습니다.");
         }
         this.name = newName;
+        this.lastModifiedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 비즈니스 로직: 프로젝트 설명만 단독 변경 (필요 시 사용)
+     */
+    public void updateDescription(String newDescription) {
+        this.description = newDescription;
         this.lastModifiedAt = LocalDateTime.now();
     }
 
