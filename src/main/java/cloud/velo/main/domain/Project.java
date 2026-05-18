@@ -13,6 +13,7 @@ import java.util.List;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(name = "project")
 public class Project {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -41,6 +42,10 @@ public class Project {
     private long totalSize;
     private int fileCount;
 
+    // 💡 1. 여기에 status 필드를 추가해야 project.getStatus()를 호출할 수 있습니다.
+    @Column(nullable = false)
+    private String status;
+
     private LocalDateTime createdAt;
     private LocalDateTime lastModifiedAt;
 
@@ -51,22 +56,26 @@ public class Project {
     private List<ProjectNode> fileNodes = new ArrayList<>();
 
     @Builder
-    public Project(String name, String description, String uuid, String framework, User user, AiModel model) {
+    public Project(String name, String description, String uuid, String framework, User user, AiModel model, String status) {
         this.name = name;
         this.description = description;
         this.uuid = uuid;
         this.framework = framework;
         this.user = user;
         this.model = model;
+        this.status = (status != null) ? status : "GENERATING"; // 기본값 방어
         this.createdAt = LocalDateTime.now();
         this.lastModifiedAt = LocalDateTime.now();
         this.totalSize = 0L;
         this.fileCount = 0;
     }
 
-    /**
-     * 색인 엔진이 돌아갈 때 DB 장부의 수치들을 한 번에 리프레시해 줄 편의 메서드
-     */
+    // 💡 3. 여기에 이 메서드가 있어야 수신 웹훅에서 project.updateStatus(...)를 호출할 수 있습니다.
+    public void updateStatus(String newStatus) {
+        this.status = newStatus;
+        this.lastModifiedAt = LocalDateTime.now(); // 상태 변경 시 수정 시간도 갱신!
+    }
+
     public void updateStorageMeta(long totalSize, int fileCount, List<ProjectNode> newNodes) {
         this.totalSize = totalSize;
         this.fileCount = fileCount;

@@ -1,9 +1,8 @@
 package cloud.velo.main.controller;
 
-import cloud.velo.main.controller.dto.FrameworkStatisticsResponse;
 import cloud.velo.main.controller.dto.ProjectCreateRequestDto;
 import cloud.velo.main.controller.dto.ProjectResponseDto;
-import cloud.velo.main.controller.dto.ProjectStatusResponseDto;
+import cloud.velo.main.controller.dto.ProjectLogResponseDto;
 import cloud.velo.main.domain.User;
 import cloud.velo.main.repository.ProjectRepository;
 import cloud.velo.main.repository.UserRepository;
