@@ -10,7 +10,7 @@ import lombok.Getter;
 public class ProjectLogResponseDto {
     private String uuid;
 
-    // 💡기에 status 필드가 선언되어 있어야 Service 레이어의 빌더가 목적지를 찾습니다.
+    // status 필드가 선언되어 있어야 Service 레이어의 빌더가 목적지를 찾습니다.
     private String status;             // GENERATING, COMPLETED, FAILED
 
     private String framework;

@@ -11,7 +11,7 @@ import cloud.velo.main.repository.ProjectRepository;
 import cloud.velo.main.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -32,7 +32,7 @@ public class ProjectLogService {
 
     // 🌟 [수정] UUID 대신 "userId:projectId" 조합을 Key로 삼는 안전한 고속 장부 수립
     private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final StringRedisTemplate redisTemplate;
 
     /**
      * 편의 메서드: 사용자 ID와 프로젝트 ID로 장부용 고유 키 생성
@@ -65,7 +65,7 @@ public class ProjectLogService {
         }
 
         String redisKey = "project:logs:" + uuid;
-        List<Object> bufferedLogs = redisTemplate.opsForList().range(redisKey, 0, -1);
+        List<String> bufferedLogs = redisTemplate.opsForList().range(redisKey, 0, -1);
         if (bufferedLogs != null) {
             for (Object raw : bufferedLogs) {
                 String[] parts = ((String) raw).split("\\|\\|", 2);
@@ -125,7 +125,7 @@ public class ProjectLogService {
         // COMPLETED 나 FAILED 신호 처리
         if (incomingStatus == ProjectStatus.COMPLETED || incomingStatus == incomingStatus.FAILED) {
 
-            List<Object> rawLogs = redisTemplate.opsForList().range(redisKey, 0, -1);
+            List<String> rawLogs = redisTemplate.opsForList().range(redisKey, 0, -1);
 
             if (rawLogs != null && !rawLogs.isEmpty()) {
                 List<ProjectLog> bulkLogEntities = new ArrayList<>();
