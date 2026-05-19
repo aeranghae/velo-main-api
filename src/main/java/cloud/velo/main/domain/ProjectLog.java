@@ -29,8 +29,9 @@ public class ProjectLog {
     @Column(name = "log_level", nullable = false)
     private String logLevel;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String status;
+    private ProjectStatus status;
 
     @Column(columnDefinition = "TEXT", nullable = false)
     private String message;
@@ -38,11 +39,11 @@ public class ProjectLog {
     private LocalDateTime createdAt;
 
     @Builder
-    public ProjectLog(User user, Project project, String logLevel, String status, String message) {
+    public ProjectLog(User user, Project project, String logLevel, ProjectStatus status, String message) {
         this.user = user;
         this.project = project;
         this.logLevel = (logLevel != null) ? logLevel : "INFO";
-        this.status = (status != null) ? status : "GENERATING";
+        this.status = (status != null) ? status : ProjectStatus.GENERATING;
         this.message = message;
         this.createdAt = LocalDateTime.now();
     }
