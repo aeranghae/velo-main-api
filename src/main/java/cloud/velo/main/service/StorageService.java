@@ -290,19 +290,27 @@ public class StorageService {
             List<Path> allPaths = stream
                     .filter(path -> !path.equals(projectFolderPath))
                     .filter(path -> {
+                        // 윈도우 환경대응을 위해 백슬래시를 전면 슬래시로 교정
                         String relativeStr = projectFolderPath.relativize(path).toString().replace("\\", "/");
 
-                        // yml 장부에 등록된 폴더명(ex: .git, .idea, node_modules) 중 하나라도 경로에 속해 있다면 탈락
-                        boolean isIgnored = ignoreDirs.stream().anyMatch(ignoreDir ->
-                                !ignoreDir.isBlank() && (
-                                        relativeStr.startsWith(ignoreDir + "/") ||
-                                                relativeStr.contains("/" + ignoreDir + "/")
-                                )
-                        );
+                        // "gradlew"가 ".gradle" 폴더명에 휩쓸려 삭제되는 contains() 버그 방어선
+                        // 경로를 디렉토리 단위 배열로 쪼개어 '정확히 단어 전체가 일치'하는지 검사합니다.
+                        String[] pathParts = relativeStr.split("/");
+
+                        boolean isIgnored = ignoreDirs.stream().anyMatch(ignoreDir -> {
+                            if (ignoreDir.isBlank()) return false;
+
+                            for (String part : pathParts) {
+                                if (part.equals(ignoreDir)) {
+                                    return true; // 제외 타겟 폴더명과 100% 완전히 일치하는 구역만 걸러냅니다.
+                                }
+                            }
+                            return false;
+                        });
 
                         if (isIgnored) return false;
 
-                        // 파일명 자체가 "." 이거나 ".." 인 리눅스 시스템 폴더 기호가 아니라면 다 허용 (.gitignore 등은 생존)
+                        // 파일명 자체가 "." 이거나 ".." 인 리눅스 시스템 폴더 기호 기각 (.gitignore 등은 정상 생존)
                         String fileName = path.getFileName().toString();
                         return !fileName.equals(".") && !fileName.equals("..");
                     })
@@ -311,7 +319,7 @@ public class StorageService {
             // 리액트 트리 뷰용 노드 데이터 조립
             List<ProjectNode> nodes = allPaths.stream()
                     .map(path -> {
-                        String relativePath = projectFolderPath.relativize(path).toString();
+                        String relativePath = projectFolderPath.relativize(path).toString().replace("\\", "/");
                         String type = Files.isDirectory(path) ? "DIR" : "FILE";
                         return new ProjectNode(relativePath, type);
                     })
