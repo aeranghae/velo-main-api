@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
+// 클라이언트에게 데이터 보내는 용도
 @Getter
 @Builder
 @AllArgsConstructor // 💡 롬복 빌더가 정상 작동하기 위해 전제되는 생성자 어노테이션

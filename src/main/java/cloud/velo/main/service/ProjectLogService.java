@@ -30,7 +30,7 @@ public class ProjectLogService {
     private final UserRepository userRepository;
     private final ProjectLogRepository projectLogRepository;
 
-    // 🌟 [수정] UUID 대신 "userId:projectId" 조합을 Key로 삼는 안전한 고속 장부 수립
+    // UUID 대신 "userId:projectId" 조합을 Key로 사용
     private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
     private final StringRedisTemplate redisTemplate;
 
