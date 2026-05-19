@@ -17,6 +17,7 @@ public class AiModelMessage {
     // 스프링이 실행 후 LLM 두뇌에게 돌려주는 결과 피드백 규격
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @ToString
     public static class Observation {
+        private String type = "OBSERVATION";
         private String status;      // "SUCCESS" 또는 "ERROR"
         private int exitCode;       // 프로세스 종료 코드
         private String stdout;      // 표준 출력 내용

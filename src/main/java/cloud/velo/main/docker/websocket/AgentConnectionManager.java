@@ -1,6 +1,8 @@
 package cloud.velo.main.docker.websocket;
 
+import cloud.velo.main.controller.dto.ProjectCreateRequestDto;
 import cloud.velo.main.docker.service.DockerAgentService;
+import cloud.velo.main.service.StorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,6 +22,7 @@ public class AgentConnectionManager {
 
     private final DockerAgentService dockerAgentService;
     private final ObjectMapper objectMapper;
+    private final StorageService storageService;
 
     @Value("${velo.storage.path}")
     private String baseStoragePath; // 주입받은 기본 경로 활용
@@ -34,7 +37,7 @@ public class AgentConnectionManager {
     /**
      * 프로젝트 생성 시작 시 호출 (uuid를 마스터 키로 사용)
      */
-    public void startProjectGeneration(String userId, String uuid, String baseImage) {
+    public void startProjectGeneration(String userId, String uuid, String email, String baseImage, ProjectCreateRequestDto requestDto) {
         // 1. 디렉토리 검증 및 세팅 (userdir/userid/uuid 구조 충실 반영)
         String hostPath = baseStoragePath + userId + "/" + uuid;
         File directory = new File(hostPath);
@@ -44,7 +47,7 @@ public class AgentConnectionManager {
         log.info("[Manager] 프로젝트 초기 저장소 확인 완료. 경로: {}", hostPath);
 
         // 2. 이 세션(UUID)만을 전용으로 담당할 독립된 웹소켓 핸들러 객체 생성
-        LlmAgentClient dynamicHandler = new LlmAgentClient(dockerAgentService, objectMapper, userId, uuid, baseImage);
+        LlmAgentClient dynamicHandler = new LlmAgentClient(dockerAgentService, objectMapper, storageService, userId, uuid, email, baseImage, requestDto);
 
         // 3. ⭐️ 하드코딩 제거: 주입받은 serverUrl 변수를 뼈대로 동적 URL 구성
         // serverUrl 값 끝에 '/' 유무에 대비해 유연하게 붙도록 처리 가능 (예: serverUrl이 ws://localhost:8000 일 때)

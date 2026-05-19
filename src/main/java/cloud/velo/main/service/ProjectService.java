@@ -16,8 +16,6 @@ import org.springframework.beans.factory.annotation.Value;
 @Slf4j
 public class ProjectService {
 
-    private final ProjectRepository projectRepository;
-    private final DirectoryTreeBuilder directoryTreeBuilder;
     private final AgentConnectionManager agentConnectionManager; // 동적 웹소켓 매니저 주입
 
     @Value("${llm.server.url:http://localhost:8000}")
@@ -35,13 +33,14 @@ public class ProjectService {
 
         // 1. 사용자가 선택한 프레임워크/언어 스택에 따라 가동할 도커 베이스 이미지 결정
         String baseImage = determineBaseImage(requestDto.getFramework(), requestDto.getLanguage());
+        String email = user.getEmail();
 
         try {
             // 2. DB 기본키(PK) 값을 파일 경로 식별용 물리 명칭(userid)으로 매핑
             String userId = String.valueOf(user.getId());
 
             // 3. 동적 웹소켓 매니저를 통해 이 프로젝트 전용 파이프라인 개설 (projectId 인자 제거, uuid 중심 구조)
-            agentConnectionManager.startProjectGeneration(userId, uuid, baseImage);
+            agentConnectionManager.startProjectGeneration(userId, uuid, email, baseImage, requestDto);
 
             log.info("[Automation] 프로젝트 전용 LLM 웹소켓 파이프라인 개설 완료. 부모폴더(userid): {}, 세션키(uuid): {}", userId, uuid);
         } catch (Exception e) {
