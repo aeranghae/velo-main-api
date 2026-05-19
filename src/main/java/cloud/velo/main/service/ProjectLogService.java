@@ -67,8 +67,8 @@ public class ProjectLogService {
         String redisKey = "project:logs:" + uuid;
         List<String> bufferedLogs = redisTemplate.opsForList().range(redisKey, 0, -1);
         if (bufferedLogs != null) {
-            for (Object raw : bufferedLogs) {
-                String[] parts = ((String) raw).split("\\|\\|", 2);
+            for (String raw : bufferedLogs) {
+                String[] parts = (raw).split("\\|\\|", 2);
                 logBuilder.append(String.format("[%s] %s\n", parts[0], parts[1]));
             }
         }
@@ -123,7 +123,7 @@ public class ProjectLogService {
         }
 
         // COMPLETED 나 FAILED 신호 처리
-        if (incomingStatus == ProjectStatus.COMPLETED || incomingStatus == incomingStatus.FAILED) {
+        if (incomingStatus == ProjectStatus.COMPLETED || incomingStatus == ProjectStatus.FAILED) {
 
             List<String> rawLogs = redisTemplate.opsForList().range(redisKey, 0, -1);
 
