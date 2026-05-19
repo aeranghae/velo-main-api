@@ -75,12 +75,16 @@ public class ProjectLogService {
 
         return ProjectLogResponseDto.builder()
                 .uuid(project.getUuid())
-                .status(project.getStatus().name())
+                .status(project.getStatus().name()) // "GENERATING" 같은 영어 이름
+
+                // 여기서 Enum에 내장된 '한글 메시지'와 '퍼센트'를 꺼내 처리합니다
+                .statusDescription(project.getStatus().getDescription()) // "Ai 소스 코드 생성중.."
+                .progress(project.getStatus().getProgress())             // 50
+
                 .framework(project.getFramework())
                 .previousLogs(logBuilder.length() == 0 ? "[System] 아직 누적된 파이프라인 로그가 존재하지 않습니다." : logBuilder.toString())
                 .build();
     }
-
     /**
      * 2. FastAPI 웹훅 로그 수신부 (Redis 버퍼링 + 밀어내기 덤프 메커니즘 탑재)
      */
@@ -101,24 +105,35 @@ public class ProjectLogService {
         String emitterKey = getEmitterKey(owner.getId(), project.getId());
         SseEmitter emitter = emitters.get(emitterKey);
 
-        if (emitter != null) {
-            try {
-                emitter.send(SseEmitter.event()
-                        .name("log-stream")
-                        .data(logLine));
-            } catch (Exception e) {
-                emitters.remove(emitterKey);
-            }
-        }
-
-        // 외부에서 들어온 String 상태를 Enum으로 번역
-        ProjectStatus incomingStatus = null;
+        ProjectStatus incomingStatus = ProjectStatus.CREATED;
         if (dto.getStatus() != null) {
             try {
                 incomingStatus = ProjectStatus.valueOf(dto.getStatus().toUpperCase());
             } catch (IllegalArgumentException e) {
                 log.warn("정의되지 않은 상태 값이 수신되었습니다: {}", dto.getStatus());
-                return;
+                return; // 잘못된 상태가 들어오면 즉시 차단
+            }
+        }
+
+        if (emitter != null) {
+            try {
+                // 텍스트 로그 라인 전송
+                emitter.send(SseEmitter.event()
+                        .name("log-stream")
+                        .data(logLine));
+
+                // 게이지 바용 상태 데이터 전송 ("상태|한글설명|퍼센트")
+                String statusPayload = String.format("%s||%s||%d",
+                        incomingStatus.name(),
+                        incomingStatus.getDescription(),
+                        incomingStatus.getProgress());
+
+                emitter.send(SseEmitter.event()
+                        .name("status-stream")
+                        .data(statusPayload));
+
+            } catch (Exception e) {
+                emitters.remove(emitterKey);
             }
         }
 
@@ -130,8 +145,8 @@ public class ProjectLogService {
             if (rawLogs != null && !rawLogs.isEmpty()) {
                 List<ProjectLog> bulkLogEntities = new ArrayList<>();
 
-                for (Object raw : rawLogs) {
-                    String[] parts = ((String) raw).split("\\|\\|", 2);
+                for (String raw : rawLogs) {
+                    String[] parts = raw.split("\\|\\|", 2);
                     bulkLogEntities.add(ProjectLog.builder()
                             .user(owner)
                             .project(project)
