@@ -72,17 +72,6 @@ public class ProjectApiController {
         return ResponseEntity.ok(newProject);
     }
 
-    /**
-     * 프로젝트 생성 상태 조회 (SSE 또는 폴링 방식 대비)
-     */
-    @GetMapping("/{projectId}/status")
-    public ResponseEntity<ProjectStatusResponseDto> getProjectStatus(@PathVariable String projectId) {
-
-
-        // 프로젝트가 현재 몇 % 진행되었는지, 혹은 완료되었는지 상태 반환 - 임시코드
-        return ResponseEntity.ok(projectService.checkStatus(projectId));
-    }
-
 }
 
 
