@@ -38,22 +38,30 @@ public class DockerAgentService {
      * [기능 1] 지정된 NFS 경로에 파일 작성 (다중 프레임워크 패키지 트리 구조 지원)
      */
     public void writeFile(String userId, String uuid, String relativePath, String content) throws IOException {
-        String baseDir = baseStoragePath + userId + "/" + uuid;
-        File directory = new File(baseDir);
 
-        if (!directory.exists()) {
-            directory.mkdirs();
+        // 1. 자바 내장 File 생성자를 활용하여 문자열 더하기 오타(userdir1)를 원천 차단
+        // 결과 경로: {baseStoragePath}/{userId}/{uuid}
+        File baseDirFile = new File(new File(baseStoragePath, userId), uuid);
+
+        // 2. 프로젝트 루트 샌드박스 폴더 자동 생성
+        if (!baseDirFile.exists()) {
+            baseDirFile.mkdirs();
         }
 
-        File file = new File(baseDir, relativePath);
-        // 하위 폴더 구조가 깊을 경우를 대비한 부모 디렉토리 자동 생성 (예: src/components/Button.tsx)
-        if (file.getParentFile() != null && !file.getParentFile().exists()) {
-            file.getParentFile().mkdirs();
+        // 3. 상대 경로에 따른 최종 파일 객체 매핑 (예: {baseDir}/test/hello.txt)
+        File file = new File(baseDirFile, relativePath);
+
+        // 4. 하위 폴더 구조가 깊을 경우를 대비한 부모 디렉토리 자동 생성 (예: src/components)
+        File parentDir = file.getParentFile();
+        if (parentDir != null && !parentDir.exists()) {
+            parentDir.mkdirs();
         }
 
+        // 5. 파일 쓰기 수행 (Try-with-resources 구조로 스트림 자동 close)
         try (FileWriter writer = new FileWriter(file)) {
             writer.write(content);
         }
+
         log.info("[DockerAgentService] 파일 생성 완료: {}", file.getAbsolutePath());
     }
 
@@ -61,16 +69,16 @@ public class DockerAgentService {
      * [기능 2] 지정된 NFS 경로의 특정 파일 삭제 (리팩토링 및 파일 정리용)
      */
     public boolean deleteFile(String userId, String uuid, String relativePath) {
-        // 1. 허용된 절대적인 가드 라인(Base 디렉토리) 정의
-        String baseDirStr = baseStoragePath + userId + "/" + uuid;
-        Path basePath = Paths.get(baseDirStr).toAbsolutePath().normalize();
+        // 1. 자바 내장 File 생성자를 활용하여 문자열 더하기 오타(userdir1)를 원천 차단
+        File baseDirFile = new File(new File(baseStoragePath, userId), uuid);
+        Path basePath = baseDirFile.toPath().toAbsolutePath().normalize();
 
-        // 2. 삭제 요청된 파일의 절대 경로 계산
+        // 2. 삭제 요청된 파일의 절대 경로 계산 및 정형화
         Path targetPath = basePath.resolve(relativePath).toAbsolutePath().normalize();
 
         log.info("[Security-Check] 삭제 시도 대상 경로 검증 - Base: {}, Target: {}", basePath, targetPath);
 
-        // 3. 대상 경로가 반드시 허용된 Base 디렉토리의 '하위 경로'로 시작하는지 검증
+        // 3. 디렉토리 트래버설(샌드박스 탈출) 공격 검증 가드
         if (!targetPath.startsWith(basePath)) {
             log.error("[Security-Check] 위험 감지! 샌드박스 탈출 시도가 차단되었습니다. 공격 유입 경로: {}", relativePath);
             throw new SecurityException("허용되지 않은 디렉토리 접근입니다. 격리 구역 외의 파일은 삭제할 수 없습니다.");
@@ -174,19 +182,29 @@ public class DockerAgentService {
      * @return 생성된 도커 컨테이너 고유 ID
      */
     public String startSandbox(String userId, String uuid, String baseImage) {
-        String hostPath = baseStorageRealPath + userId + "/" + uuid;
+        // 1. 자바 내장 File 생성자를 활용하여 문자열 더하기 오타(userdir1)를 원천 차단
+        // 외부 도커 데몬이 마운트해야 하므로 물리 절대 경로인 'baseStorageRealPath'(realpath)를 사용합니다.
+        File hostPhysicalDir = new File(new File(baseStorageRealPath, userId), uuid);
+        String hostPhysicalPath = hostPhysicalDir.getAbsolutePath();
+
+        // 2. 디버깅 및 추적용 파드 내부 NFS 마운트 경로 (선택 사항 - 로그 출력용)
+        // File podLocalDir = new File(new File(baseStoragePath, userId), uuid);
+        // log.info("[Sandbox] 파드 내부 실제 작업 관측 경로: {}", podLocalDir.getAbsolutePath());
+
         Volume containerVolume = new Volume("/workspace");
-        Bind bind = new Bind(hostPath, containerVolume);
+        Bind bind = new Bind(hostPhysicalPath, containerVolume);
 
         log.info("[Sandbox] 샌드박스 컨테이너 기동 시작 (지속 실행 모드) - 이미지: {}", baseImage);
+        log.info("[Sandbox] 미니 PC 호스트 물리 매핑 경로 (도커 마운트용): {}", hostPhysicalPath);
 
+        // 3. 컨테이너 생성 및 자원 격리 제한선(자드가 가동) 설정
         CreateContainerResponse container = dockerClient.createContainerCmd(baseImage)
                 .withName("agent-sandbox-" + uuid)
                 .withHostConfig(HostConfig.newHostConfig()
                         .withBinds(bind)
                         .withCpuQuota(100000L)   // 1코어 제한
                         .withMemory(536870912L)) // 512MB 제한
-                .withTty(true) // 컨테이너가 즉시 백그라운드로 안 끄지고 명령을 대기하도록 설정
+                .withTty(true) // 컨테이너가 즉시 종료되지 않고 지속적으로 명령을 대기하도록 설정
                 .exec();
 
         String containerId = container.getId();
