@@ -53,20 +53,20 @@ public class ProjectService {
      */
     private String determineBaseImage(String framework, String language) {
         // 1. 파이썬 계열 스택
-        if ("FastAPI".equalsIgnoreCase(framework) || "Python".equalsIgnoreCase(language)) {
+        if ("fastapi".equalsIgnoreCase(framework) || "Python".equalsIgnoreCase(language)) {
             return "python:3.11-slim";
         }
         // 2. 자바스크립트 / 타입스크립트 생태계 전체 (React, Next.js, NestJS, Vue, Node.js)
-        else if ("React".equalsIgnoreCase(framework) ||
-                "Next.js".equalsIgnoreCase(framework) || "Nextjs".equalsIgnoreCase(framework) ||
-                "NestJS".equalsIgnoreCase(framework) || "Nestjs".equalsIgnoreCase(framework) ||
-                "Vue".equalsIgnoreCase(framework) || "Vue.js".equalsIgnoreCase(framework) ||
+        else if ("react".equalsIgnoreCase(framework) ||
+                "Next.js".equalsIgnoreCase(framework) || "nextjs".equalsIgnoreCase(framework) ||
+                "NestJS".equalsIgnoreCase(framework) || "nestjs".equalsIgnoreCase(framework) ||
+                "vue".equalsIgnoreCase(framework) || "Vue.js".equalsIgnoreCase(framework) ||
                 "Node".equalsIgnoreCase(language) || "Node.js".equalsIgnoreCase(language) ||
                 "TypeScript".equalsIgnoreCase(language) || "JavaScript".equalsIgnoreCase(language)) {
             return "node:20-alpine";
         }
         // 3. 자바 계열 엔터프라이즈 스택
-        else if ("Spring Boot".equalsIgnoreCase(framework) || "Spring".equalsIgnoreCase(framework) ||
+        else if ("spring-boot".equalsIgnoreCase(framework) || "spring".equalsIgnoreCase(framework) ||
                 "Java".equalsIgnoreCase(language)) {
             return "openjdk:21-slim";
         }
