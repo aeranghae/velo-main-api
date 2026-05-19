@@ -138,6 +138,9 @@ public class LlmAgentClient extends TextWebSocketHandler {
             observation = new AiModelMessage.Observation("OBSERVATION", "ERROR", 1, "", "지원하지 않는 도구입니다.");
         }
 
+        // 파일 관련 수정 후 색인 갱신
+        storageService.indexProjectFiles(this.uuid);
+
         // 결과를 FastAPI 측으로 다시 전송하여 다음 행동을 결정하게 함
         String jsonResponse = objectMapper.writeValueAsString(observation);
         session.sendMessage(new TextMessage(jsonResponse));
