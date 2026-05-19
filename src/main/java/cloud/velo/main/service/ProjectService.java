@@ -32,6 +32,7 @@ public class ProjectService {
         log.info("[Automation] 프로젝트 자동화 공정 트리거 가동 시작. UUID: {}", uuid);
 
         // 1. 사용자가 선택한 프레임워크/언어 스택에 따라 가동할 도커 베이스 이미지 결정
+        log.info("[Automation] 선정된 프레임워크 출력: {}", requestDto.getFramework());
         String baseImage = determineBaseImage(requestDto.getFramework(), requestDto.getLanguage());
         String email = user.getEmail();
 
