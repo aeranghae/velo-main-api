@@ -381,7 +381,7 @@ public class StorageService {
         }
 
         try {
-            // 2. 물리 저장소 절대 경로 조립 (/app/storage/userdir/{userId}/{projectUuid}/{relativePath})
+            // 2. 물리 저장소 절대 경로 조립
             Path rootPath = Paths.get(baseStoragePath).normalize();
             Path targetFilePath = rootPath
                     .resolve(String.valueOf(user.getId()))
@@ -400,9 +400,20 @@ public class StorageService {
                 throw new IllegalArgumentException("파일을 찾을 수 없거나 올바른 파일 포맷이 아닙니다.");
             }
 
+            // [교정 핵심]: 바이너리 파일 차단 Guard 설정
+            // .jar, .class, .png 등 텍스트로 읽을 수 없는 확장자는 사전에 걸러내어 에러를 방지합니다.
+            String fileName = targetFilePath.getFileName().toString().toLowerCase();
+            if (fileName.endsWith(".jar") || fileName.endsWith(".class") || fileName.endsWith(".zip")) {
+                return "[Binary File] 다운로드만 가능한 바이너리 파일입니다. 에디터에서 내용을 표시할 수 없습니다.";
+            }
+
             // 4. NFS 디스크에서 진짜 소스 코드 텍스트 긁어오기
             return Files.readString(targetFilePath, java.nio.charset.StandardCharsets.UTF_8);
 
+        } catch (java.nio.charset.MalformedInputException e) {
+            //[인프라 가드]: 만약 확장자 체크를 놓친 다른 이진 파일이 들어와도 서버가 터지지 않게 예외 격리
+            log.warn("[StorageService] 인코딩 오류 - 텍스트 파일이 아닙니다. Path: {}", path);
+            return "[Binary File] 인코딩할 수 없는 파일 포맷입니다.";
         } catch (IOException e) {
             log.error("NFS 파일 읽기 실패 - UUID: {}, Path: {}", uuid, path, e);
             throw new RuntimeException("파일 시스템에서 내용을 읽어오지 못했습니다.", e);
