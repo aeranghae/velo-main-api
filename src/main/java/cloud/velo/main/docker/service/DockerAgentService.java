@@ -113,10 +113,14 @@ public class DockerAgentService {
         try {
             log.info("[Sandbox] 명령어 실행 (컨테이너 상태 유지): {}", cmd);
 
+            // 독자 프로세스로 켜면 스트림이 누락될 수 있으므로
+            // 리눅스 쉘 환경(sh -c)을 명시적으로 매핑하여 명령어를 래핑합니다.
+            String[] shellCmd = {"sh", "-c", cmd};
+
             ExecCreateCmdResponse execCreateCmd = dockerClient.execCreateCmd(containerId)
                     .withAttachStdout(true)
                     .withAttachStderr(true)
-                    .withCmd(cmd.split(" "))
+                    .withCmd(shellCmd) // ⭐️ 교정된 쉘 명령어 배열 주입
                     .exec();
 
             ResultCallback.Adapter<Frame> resultCallback = new ResultCallback.Adapter<>() {
@@ -151,16 +155,17 @@ public class DockerAgentService {
             String stdout = stdoutStream.toString().trim();
             String stderr = stderrStream.toString().trim();
 
-            if (!stderr.isEmpty()) {
+            // 수집된 두 가닥의 스트림 원본을 모두 전송 객체에 바인딩
+            observation.setStdout(stdout);
+            observation.setStderr(stderr);
+
+            // java -version 대응 및 런타임 예외 필터링
+            if (!stderr.isEmpty() && (stderr.toLowerCase().contains("exception") || stderr.toLowerCase().contains("error"))) {
                 observation.setStatus("ERROR");
                 observation.setExitCode(1);
-                observation.setStderr(stderr);
-                observation.setStdout(stdout);
             } else {
                 observation.setStatus("SUCCESS");
                 observation.setExitCode(0);
-                observation.setStdout(stdout);
-                observation.setStderr("");
             }
 
         } catch (Exception e) {
