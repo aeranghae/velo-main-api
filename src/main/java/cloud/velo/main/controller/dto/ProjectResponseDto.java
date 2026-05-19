@@ -11,6 +11,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ProjectResponseDto {
     private String projectName;   // 유저가 설정한 실제 프로젝트 이름 (화면 표시용)
+    private String description;
+    private String status;
     private String uuid;          // 서버와 통신할 때 사용할 고유 식별자 (물리 폴더명)
     private String framework;
     private String model;
