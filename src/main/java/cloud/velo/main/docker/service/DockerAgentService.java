@@ -31,6 +31,9 @@ public class DockerAgentService {
     @Value("${velo.storage.path}")
     private String baseStoragePath;
 
+    @Value("${velo.storage.realpath}")
+    private String baseStorageRealPath;
+
     /**
      * [기능 1] 지정된 NFS 경로에 파일 작성 (다중 프레임워크 패키지 트리 구조 지원)
      */
@@ -171,7 +174,7 @@ public class DockerAgentService {
      * @return 생성된 도커 컨테이너 고유 ID
      */
     public String startSandbox(String userId, String uuid, String baseImage) {
-        String hostPath = baseStoragePath + userId + "/" + uuid;
+        String hostPath = baseStorageRealPath + userId + "/" + uuid;
         Volume containerVolume = new Volume("/workspace");
         Bind bind = new Bind(hostPath, containerVolume);
 
