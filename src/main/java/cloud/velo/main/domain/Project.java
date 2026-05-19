@@ -31,8 +31,9 @@ public class Project {
     private String framework;
 
     // 현재 진행 상황을 나타내는 필드
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String status;
+    private ProjectStatus status;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ai_model_id")
@@ -62,7 +63,7 @@ public class Project {
         this.framework = framework;
         this.user = user;
         this.model = model;
-        this.status = "Created"; // 프로젝트를 처음 만들었을때 default
+        this.status = ProjectStatus.CREATED; // 프로젝트를 처음 만들었을때 default
         this.createdAt = LocalDateTime.now();
         this.lastModifiedAt = LocalDateTime.now();
         this.totalSize = 0L;
@@ -125,8 +126,8 @@ public class Project {
     }
 
     // ProjectService에서 작업이 끝나거나 실패했을때 상태를 바꿈
-    public void updateStatus(String status) {
-        if (status == null || status.isBlank()) {
+    public void updateStatus(ProjectStatus status) {
+        if (status == null) {
             throw new IllegalArgumentException("상태 정보는 비어있을 수 없습니다.");
         }
         this.status = status;

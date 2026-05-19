@@ -4,8 +4,10 @@ import cloud.velo.main.controller.dto.ProjectLogResponseDto;
 import cloud.velo.main.controller.dto.ProjectLogSaveDto;
 import cloud.velo.main.service.ProjectLogService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequestMapping("/api/projects")
@@ -37,5 +39,10 @@ public class ProjectLogController {
     public ResponseEntity<Void> receiveWorkerLog(@RequestBody ProjectLogSaveDto dto) {
         projectLogService.saveWorkerLog(dto);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping(value = "/{uuid}/logs/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamProjectLogs(@PathVariable("uuid") String uuid) {
+        return projectLogService.createSseConnection(uuid);
     }
 }
