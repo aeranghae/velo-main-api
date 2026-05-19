@@ -42,7 +42,9 @@ public class ProjectLogController {
     }
 
     @GetMapping(value = "/{uuid}/logs/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamProjectLogs(@PathVariable("uuid") String uuid) {
-        return projectLogService.createSseConnection(uuid);
+    public SseEmitter streamProjectLogs(
+            @PathVariable("uuid") String uuid,
+            @RequestParam("loginEmail") String loginEmail) {
+        return projectLogService.createSseConnection(uuid, loginEmail);
     }
 }
