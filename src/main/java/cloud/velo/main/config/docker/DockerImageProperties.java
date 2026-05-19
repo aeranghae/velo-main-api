@@ -11,7 +11,7 @@ import java.util.Map;
 @Getter
 @Setter
 @Configuration
-@ConfigurationProperties(prefix = "velo.network")
+@ConfigurationProperties(prefix = "velo.docker")
 public class DockerImageProperties {
 
     private String defaultImage = "ubuntu:22.04";
