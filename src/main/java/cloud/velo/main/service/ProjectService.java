@@ -1,10 +1,9 @@
 package cloud.velo.main.service;
 
+import cloud.velo.main.config.docker.DockerImageProperties;
 import cloud.velo.main.controller.dto.ProjectCreateRequestDto;
 import cloud.velo.main.docker.websocket.AgentConnectionManager;
 import cloud.velo.main.domain.User;
-import cloud.velo.main.repository.ProjectRepository;
-import cloud.velo.main.util.storage.DirectoryTreeBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -17,6 +16,7 @@ import org.springframework.beans.factory.annotation.Value;
 public class ProjectService {
 
     private final AgentConnectionManager agentConnectionManager; // 동적 웹소켓 매니저 주입
+    private final DockerImageProperties dockerImageProperties;
 
     @Value("${llm.server.url:http://localhost:8000}")
     private String llmServerUrl;
@@ -49,29 +49,23 @@ public class ProjectService {
     }
 
     /**
-     * LLM 에이전트가 실행 파일 검사/테스트 시 가동할 런타임 도커 가드 이미지 선택
+     * YML 설정 대장을 기반으로 런타임 도커 가드 이미지 동적 선택
      */
     private String determineBaseImage(String framework, String language) {
-        // 1. 파이썬 계열 스택
-        if ("fastapi".equalsIgnoreCase(framework) || "Python".equalsIgnoreCase(language)) {
-            return "python:3.11-slim";
-        }
-        // 2. 자바스크립트 / 타입스크립트 생태계 전체 (React, Next.js, NestJS, Vue, Node.js)
-        else if ("react".equalsIgnoreCase(framework) ||
-                "Next.js".equalsIgnoreCase(framework) || "nextjs".equalsIgnoreCase(framework) ||
-                "NestJS".equalsIgnoreCase(framework) || "nestjs".equalsIgnoreCase(framework) ||
-                "vue".equalsIgnoreCase(framework) || "Vue.js".equalsIgnoreCase(framework) ||
-                "Node".equalsIgnoreCase(language) || "Node.js".equalsIgnoreCase(language) ||
-                "TypeScript".equalsIgnoreCase(language) || "JavaScript".equalsIgnoreCase(language)) {
-            return "node:20-alpine";
-        }
-        // 3. 자바 계열 엔터프라이즈 스택
-        else if ("spring-boot".equalsIgnoreCase(framework) || "spring".equalsIgnoreCase(framework) ||
-                "Java".equalsIgnoreCase(language)) {
-            return "openjdk:21-slim";
+        // 1. 프레임워크 매핑 매치 시도
+        String image = dockerImageProperties.findFrameworkImage(framework);
+        if (image != null) {
+            return image;
         }
 
-        // 기본 범용 리눅스 환경 이미지 (매핑되지 않는 미지의 프레임워크 대비용 가드)
-        return "ubuntu:22.04";
+        // 2. 프레임워크 매치 실패 시 언어 매핑 매치 시도
+        image = dockerImageProperties.findLanguageImage(language);
+        if (image != null) {
+            return image;
+        }
+
+        // 3. 둘 다 매핑 대장에 없는 미지의 스택일 경우 백가드 기본 이미지 출격
+        log.warn("[Automation] 매핑되는 도커 이미지를 찾지 못해 기본 리눅스 가드로 대체합니다. Framework: {}, Language: {}", framework, language);
+        return dockerImageProperties.getDefaultImage();
     }
 }
