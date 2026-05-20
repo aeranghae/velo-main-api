@@ -209,7 +209,7 @@ public class DockerAgentService {
                 .withHostConfig(HostConfig.newHostConfig()
                         .withBinds(bind)
                         .withCpuQuota(100000L)   // 1코어 제한
-                        .withMemory(536870912L)) // 512MB 제한
+                        .withMemory(2147483648L)) // 2G 제한
                 .withTty(true) // 컨테이너가 즉시 종료되지 않고 지속적으로 명령을 대기하도록 설정
                 .exec();
 
