@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -34,12 +36,8 @@ public class ProjectLogService {
     private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
     private final StringRedisTemplate redisTemplate;
 
-    /**
-     * 편의 메서드: 사용자 ID와 프로젝트 ID로 장부용 고유 키 생성
-     */
-    private String getEmitterKey(Long userId, Long projectId) {
-        return userId + ":" + projectId;
-    }
+    // 시간 포멧터
+    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     /**
      * 1. 과거 로그 전체 조회 (DB 데이터 + Redis 임시 버퍼 데이터 실시간 병합 서빙)
@@ -59,30 +57,31 @@ public class ProjectLogService {
 
         StringBuilder logBuilder = new StringBuilder();
 
+        // DB 로그 복원
         List<ProjectLog> dbLogs = projectLogRepository.findLogsByUserIdAndProjectId(currentUser.getId(), project.getId());
         for (ProjectLog bl : dbLogs) {
             logBuilder.append(String.format("[%s] %s\n", bl.getLogLevel(), bl.getMessage()));
         }
 
+        // redis 로그 복원
         String redisKey = "project:logs:" + uuid;
         List<String> bufferedLogs = redisTemplate.opsForList().range(redisKey, 0, -1);
         if (bufferedLogs != null) {
             for (String raw : bufferedLogs) {
-                String[] parts = (raw).split("\\|\\|", 2);
-                logBuilder.append(String.format("[%s] %s\n", parts[0], parts[1]));
+                String[] parts = raw.split("\\|\\|", 3); // 🌟 3파트로 파싱
+                if (parts.length < 3) continue;
+
+                // ISO 표준 시간을 포멧터로 지정
+                String timeStr = LocalDateTime.parse(parts[1]).format(TIME_FORMATTER);
+                logBuilder.append(String.format("[%s][%s] %s\n", parts[0], timeStr, parts[2]));
             }
         }
 
         return ProjectLogResponseDto.builder()
                 .uuid(project.getUuid())
                 .status(project.getStatus().name()) // "GENERATING" 같은 영어 이름
-
-                // 여기서 Enum에 내장된 '한글 메시지'와 '퍼센트'를 꺼내 처리합니다
-                .statusDescription(project.getStatus().getDescription()) // "Ai 소스 코드 생성중.."
-                .progress(project.getStatus().getProgress())             // 50
-
                 .framework(project.getFramework())
-                .previousLogs(logBuilder.length() == 0 ? "[System] 아직 누적된 파이프라인 로그가 존재하지 않습니다." : logBuilder.toString())
+                .previousLogs(logBuilder.isEmpty() ? "[System] 아직 누적된 파이프라인 로그가 존재하지 않습니다." : logBuilder.toString())
                 .build();
     }
     /**
@@ -90,20 +89,19 @@ public class ProjectLogService {
      */
     @Transactional
     public void saveWorkerLog(ProjectLogSaveDto dto) {
-        String redisKey = "project:logs:" + dto.getUuid();
 
-        // 1. Redis 버퍼 리스트에 실시간 적재
-        String logLine = dto.getLogLevel() + "||" + dto.getMessage();
+        String uuid = dto.getUuid();
+        String redisKey = "project:logs:" + uuid;
+
+        // 로그 발생 시점 서버 시간
+        String createdAtStr = LocalDateTime.now().toString();
+
+        // 1. Redis 버퍼 리스트에 실시간 적재 (LEVEL||TIME||MESSAGE)
+        String logLine = dto.getLogLevel() + "||" + createdAtStr + "||" + dto.getMessage();
         redisTemplate.opsForList().rightPush(redisKey, logLine);
 
-        // 실시간 스트리밍 중계를 위해 연관된 실물 엔티티 정보(User, Project ID)를 먼저 조회합니다.
-        Project project = projectRepository.findByUuid(dto.getUuid())
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 프로젝트 UUID: " + dto.getUuid()));
-        User owner = project.getUser();
 
-        // "userId:projectId" 조합 키로 정확하게 매핑된 에미터를 추적합니다.
-        String emitterKey = getEmitterKey(owner.getId(), project.getId());
-        SseEmitter emitter = emitters.get(emitterKey);
+        SseEmitter emitter = emitters.get(uuid);
 
         ProjectStatus incomingStatus = ProjectStatus.CREATED;
         if (dto.getStatus() != null) {
@@ -122,29 +120,21 @@ public class ProjectLogService {
                         .name("log-stream")
                         .data(logLine));
 
-                // 게이지 바용 상태 데이터 전송 ("상태|한글설명|퍼센트")
-                String statusPayload = String.format("%s||%s||%d",
-                        incomingStatus.name(),
-                        incomingStatus.getDescription(),
-                        incomingStatus.getProgress());
-
-                emitter.send(SseEmitter.event()
-                        .name("status-stream")
-                        .data(statusPayload));
-
             } catch (Exception e) {
-                emitters.remove(emitterKey);
+                emitters.remove(uuid);
             }
         }
 
-        // COMPLETED 나 FAILED 신호 처리
+        // COMPLETED 나 FAILED만 DB에 한번 저장
         if (incomingStatus == ProjectStatus.COMPLETED || incomingStatus == ProjectStatus.FAILED) {
-
             List<String> rawLogs = redisTemplate.opsForList().range(redisKey, 0, -1);
 
             if (rawLogs != null && !rawLogs.isEmpty()) {
-                List<ProjectLog> bulkLogEntities = new ArrayList<>();
 
+                Project project = projectRepository.findByUuid(uuid).orElseThrow();
+                User owner = project.getUser();
+
+                List<ProjectLog> bulkLogEntities = new ArrayList<>();
                 for (String raw : rawLogs) {
                     String[] parts = raw.split("\\|\\|", 2);
                     bulkLogEntities.add(ProjectLog.builder()
@@ -152,22 +142,21 @@ public class ProjectLogService {
                             .project(project)
                             .logLevel(parts[0])
                             .status(incomingStatus)
+                            .createdAt(LocalDateTime.parse(parts[1]))
                             .message(parts[1])
                             .build());
                 }
 
                 projectLogRepository.saveAll(bulkLogEntities);
-                log.info("▶ [Redis ➡️ DB Dump 완료] 총 {}개의 로그가 PostgreSQL로 일괄 덤프되었습니다.", bulkLogEntities.size());
+                project.updateStatus(incomingStatus); // 프로젝트 최종상태 업데이트
             }
 
             //  공정 종결 시 종결된 복합 키를 타겟으로 에미터 종료 및 장부 삭제 진행
             if (emitter != null) {
                 emitter.complete();
             }
-            emitters.remove(emitterKey);
-
+            emitters.remove(uuid);
             redisTemplate.delete(redisKey);
-            project.updateStatus(incomingStatus);
         }
     }
 
@@ -177,25 +166,19 @@ public class ProjectLogService {
      */
     @Transactional(readOnly = true)
     public SseEmitter createSseConnection(String uuid, String loginEmail) {
-        User currentUser = userRepository.findByEmail(loginEmail)
-                .orElseThrow(() -> new IllegalArgumentException("인증되지 않은 사용자입니다: " + loginEmail));
-
-        Project project = projectRepository.findByUuid(uuid)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 프로젝트입니다. UUID: " + uuid));
+        User currentUser = userRepository.findByEmail(loginEmail).orElseThrow();
+        Project project = projectRepository.findByUuid(uuid).orElseThrow();
 
         if (!project.getUser().getId().equals(currentUser.getId())) {
-            throw new SecurityException("해당 프로젝트의 스트리밍을 구독할 정식 권한이 없습니다.");
+            throw new SecurityException("권한이 없습니다.");
         }
 
-        // 안전한 유저별 복합 키 생성 ("userId:projectId")
-        String emitterKey = getEmitterKey(currentUser.getId(), project.getId());
-
+        // 복잡한 키 대신 직관적이고 빠른 uuid를 전화선 번호로 씁니다.
         SseEmitter emitter = new SseEmitter(60 * 1000L);
-        emitters.put(emitterKey, emitter);
+        emitters.put(uuid, emitter);
 
-        // 에러나 만료 시 복합 키를 기준으로 장부에서 격리 및 삭제
-        emitter.onCompletion(() -> emitters.remove(emitterKey));
-        emitter.onTimeout(() -> emitters.remove(emitterKey));
+        emitter.onCompletion(() -> emitters.remove(uuid));
+        emitter.onTimeout(() -> emitters.remove(uuid));
 
         return emitter;
     }

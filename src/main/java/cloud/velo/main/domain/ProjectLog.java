@@ -39,12 +39,12 @@ public class ProjectLog {
     private LocalDateTime createdAt;
 
     @Builder
-    public ProjectLog(User user, Project project, String logLevel, ProjectStatus status, String message) {
+    public ProjectLog(User user, Project project, String logLevel, ProjectStatus status, String message, LocalDateTime createdAt) {
         this.user = user;
         this.project = project;
         this.logLevel = (logLevel != null) ? logLevel : "INFO";
         this.status = (status != null) ? status : ProjectStatus.GENERATING;
         this.message = message;
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = (createdAt != null) ? createdAt : LocalDateTime.now();
     }
 }
