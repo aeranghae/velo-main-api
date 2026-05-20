@@ -29,18 +29,6 @@ public class ProjectLogController {
         ProjectLogResponseDto response = projectLogService.getProjectMetadataAndLogs(uuid, loginEmail);
         return ResponseEntity.ok(response);
     }
-
-    /*
-     * AI 워커 전용 실시간 로그 수신 API (웹훅)
-     * AI 작업 서버(또는 테스트용 스크립트)가 작업 진행 상황을 실시간으로 쏘아보내는 창구입니다.
-     * 받은 데이터는 서비스 계층으로 넘겨 Redis 버퍼에 임시 저장합니다.
-     */
-    @PostMapping("/webhook/logs")
-    public ResponseEntity<Void> receiveWorkerLog(@RequestBody ProjectLogSaveDto dto) {
-        projectLogService.saveWorkerLog(dto);
-        return ResponseEntity.ok().build();
-    }
-
     @GetMapping(value = "/{uuid}/logs/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamProjectLogs(
             @PathVariable("uuid") String uuid,

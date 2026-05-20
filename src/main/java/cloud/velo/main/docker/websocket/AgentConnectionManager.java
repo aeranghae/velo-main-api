@@ -2,6 +2,7 @@ package cloud.velo.main.docker.websocket;
 
 import cloud.velo.main.controller.dto.ProjectCreateRequestDto;
 import cloud.velo.main.docker.service.DockerAgentService;
+import cloud.velo.main.service.ProjectLogService;
 import cloud.velo.main.service.StorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,7 @@ public class AgentConnectionManager {
     private final DockerAgentService dockerAgentService;
     private final ObjectMapper objectMapper;
     private final StorageService storageService;
+    private final ProjectLogService projectLogService;
 
     @Value("${velo.storage.path}")
     private String baseStoragePath; // 주입받은 기본 경로 활용
@@ -47,7 +49,16 @@ public class AgentConnectionManager {
         log.info("[Manager] 프로젝트 초기 저장소 확인 완료. 경로: {}", hostPath);
 
         // 2. 이 세션(UUID)만을 전용으로 담당할 독립된 웹소켓 핸들러 객체 생성
-        LlmAgentClient dynamicHandler = new LlmAgentClient(dockerAgentService, objectMapper, storageService, userId, uuid, email, baseImage, requestDto);
+        LlmAgentClient dynamicHandler = new LlmAgentClient(
+                dockerAgentService,
+                objectMapper,
+                storageService,
+                userId,
+                uuid,
+                email,
+                baseImage,
+                requestDto,
+                projectLogService);
 
         // 3. ⭐️ 하드코딩 제거: 주입받은 serverUrl 변수를 뼈대로 동적 URL 구성
         // serverUrl 값 끝에 '/' 유무에 대비해 유연하게 붙도록 처리 가능 (예: serverUrl이 ws://localhost:8000 일 때)
