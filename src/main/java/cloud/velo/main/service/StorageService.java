@@ -56,6 +56,18 @@ public class StorageService {
     private List<String> ignoreDirs;
 
     /**
+     *  [스프링 라이프사이클 훅]
+     * 스프링이 켜지면서 @Value 주입을 완전히 마친 직후, 문자열을 Path 객체로 안전하게 변환
+     */
+    @PostConstruct
+    public void init() {
+        this.nfsRootPath = Paths.get(baseStoragePath).normalize();
+        log.info("StorageService 가동 - 설정된 NFS 루트 경로: {}", this.nfsRootPath);
+    }
+
+    // 생성 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    /**
      * 사용자 루트 디렉토리 생성 (로그인 시 호출)
      * 경로: {baseStoragePath}/{userId}
      */
@@ -88,6 +100,7 @@ public class StorageService {
         // 3. DB 저장 (엔티티 생성자 내부에서 totalSize=0L, fileCount=0으로 안전하게 초기화됨)
         Project project = projectRepository.save(Project.builder()
                 .name(requestDto.getProjectName())
+                .description("")
                 .uuid(uuid)
                 .framework(requestDto.getFramework())
                 .user(user)
@@ -113,6 +126,8 @@ public class StorageService {
         // convertToDto를 버리고 디스크 스캔 없이 0L, 0개로 DTO 즉시 조립 및 반환
         return ProjectResponseDto.builder()
                 .projectName(project.getName())
+                .description(project.getDescription())
+                .status(project.getStatus().toString())
                 .uuid(project.getUuid())
                 .framework(project.getFramework())
                 .model(project.getModel().getModelName())
@@ -123,79 +138,35 @@ public class StorageService {
                 .build();
     }
 
-    // 오류 발생 시 uuid 기반 폴더 삭제
-    private void deleteDirectory(Path path) {
-        try {
-            if (Files.exists(path)) {
-                Files.walk(path)
-                        .sorted(Comparator.reverseOrder())
-                        .forEach(p -> {
-                            try { Files.delete(p); }
-                            catch (IOException ignored) {}
-                        });
-            }
-        } catch (IOException e) {
-            log.error("폴더 삭제 실패: {}", path, e);
-        }
-    }
-
-    // AI모델 선택 예외 처리
-    private AiModel resolveModel(User user, String requestModel) {
-        // 1. 요청 모델명 → 2. 유저 기본 모델 → 3. 시스템 기본 모델 순으로 탐색
-        return Optional.ofNullable(requestModel)
-                .filter(m -> !m.isBlank())
-                .flatMap(aiModelRepository::findByModelNameAndIsActiveTrue)
-                .or(() -> Optional.ofNullable(user.getModel()))
-                .or(() -> aiModelRepository.findByDefaultActiveTrue())
-                .orElseThrow(() -> new IllegalStateException("사용 가능한 AI 모델이 시스템에 존재하지 않습니다."));
-    }
-
     /**
-     * 사용자 프로젝트 상세 목록 조회 (DB 정보 + 물리적 통계)
+     * 프로젝트 설명 변경
      */
-    @Transactional(readOnly = true)
-    @Cacheable(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
-    public List<ProjectResponseDto> getUserProjectDetails(User user) {
-        List<Project> projects = projectRepository.findByUserOrderByLastModifiedAtDesc(user);
+    @Transactional
+    @CacheEvict(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
+    public ProjectResponseDto updateProjectDescription(User user, String uuid, String description) {
 
-        if (projects.isEmpty()) return Collections.emptyList();
+        // 1. URL로 들어온 uuid와 인증된 유저 정보로 프로젝트 검증 및 조회
+        Project project = projectRepository.findByUuidAndUser(uuid, user)
+                .orElseThrow(() -> new IllegalArgumentException("해당 프로젝트를 찾을 수 없거나 수정 권한이 없습니다."));
 
+        // 2. 설명 단독 변경 (내부에서 수정 시간 반영)
+        project.updateDescription(description);
+
+        // 3. 기존 규칙대로 NFS 디스크 스캔 없이 DB 데이터로만 즉시 DTO 조립 및 반환
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-        return projects.stream()
-                .map(project -> ProjectResponseDto.builder()
-                        .projectName(project.getName())
-                        .uuid(project.getUuid())
-                        .framework(project.getFramework())
-                        .model(project.getModel().getModelName())
-                        .createdAt(project.getCreatedAt().format(formatter))
-                        // DB 컬럼에 저장해둔 최신화된 수정 시간, 용량, 파일 수를 0.0001초만에 즉시 매핑 (NFS I/O 제로)
-                        .lastModified(project.getLastModifiedAt().format(formatter))
-                        .size(project.getTotalSize())
-                        .fileCount(project.getFileCount())
-                        .build())
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * 유저의 전체 스토리지 사용량 조회 (NFS 디스크 스캔 X, DB 초고속 합산)
-     */
-    @Transactional(readOnly = true)
-    public long getUserTotalStorageUsage(User user) {
-        // DB 에 적힌 프로젝트 용량만 합산해서 즉시 리턴합니다.
-        return projectRepository.getTotalStorageSizeByUser(user);
-    }
-
-    /**
-     * 폴더 내 일반 파일 개수 카운트
-     */
-    private int getFileCount(Path path) {
-        if (Files.notExists(path)) return 0;
-        try (var stream = Files.walk(path)) {
-            return (int) stream.filter(Files::isRegularFile).count();
-        } catch (IOException e) {
-            return 0;
-        }
+        return ProjectResponseDto.builder()
+                .projectName(project.getName())
+                .description(project.getDescription())
+                .status(project.getStatus().toString())
+                .uuid(project.getUuid())
+                .framework(project.getFramework())
+                .model(project.getModel().getModelName())
+                .createdAt(project.getCreatedAt().format(formatter))
+                .lastModified(project.getLastModifiedAt().format(formatter))
+                .size(project.getTotalSize())
+                .fileCount(project.getFileCount())
+                .build();
     }
 
     /**
@@ -217,6 +188,8 @@ public class StorageService {
         // 무거운 convertToDto(NFS 디스크 스캔)를 버리고, 엔티티 컬럼 값으로 즉시 DTO 조립
         return ProjectResponseDto.builder()
                 .projectName(project.getName())
+                .description(project.getDescription())
+                .status(project.getStatus().toString())
                 .uuid(project.getUuid())
                 .framework(project.getFramework())
                 .model(project.getModel().getModelName())
@@ -246,29 +219,47 @@ public class StorageService {
         deleteDirectoryRecursive(projectPath);
     }
 
+    // 조회 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
     /**
-     * 폴더 내부까지 재귀적으로 삭제하는 헬퍼 메서드
+     * 사용자 프로젝트 상세 목록 조회 (DB 정보 + 물리적 통계)
      */
-    private void deleteDirectoryRecursive(Path path) {
-        if (Files.exists(path)) {
-            try (var walk = Files.walk(path)) {
-                walk.sorted(java.util.Comparator.reverseOrder()) // 하위 파일부터 삭제
-                        .map(Path::toFile)
-                        .forEach(java.io.File::delete);
-            } catch (IOException e) {
-                throw new RuntimeException("물리적 폴더 삭제 실패: " + path, e);
-            }
-        }
+    @Transactional(readOnly = true)
+    @Cacheable(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
+    public List<ProjectResponseDto> getUserProjectDetails(User user) {
+        List<Project> projects = projectRepository.findByUserOrderByLastModifiedAtDesc(user);
+
+        if (projects.isEmpty()) return Collections.emptyList();
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+        return projects.stream()
+                .map(project -> ProjectResponseDto.builder()
+                        .projectName(project.getName())
+                        .description(project.getDescription())
+                        .status(project.getStatus().toString())
+                        .uuid(project.getUuid())
+                        .framework(project.getFramework())
+                        .model(project.getModel().getModelName())
+                        .createdAt(project.getCreatedAt().format(formatter))
+                        // DB 컬럼에 저장해둔 최신화된 수정 시간, 용량, 파일 수를 0.0001초만에 즉시 매핑 (NFS I/O 제로)
+                        .lastModified(project.getLastModifiedAt().format(formatter))
+                        .size(project.getTotalSize())
+                        .fileCount(project.getFileCount())
+                        .build())
+                .collect(Collectors.toList());
     }
 
     /**
-     *  [스프링 라이프사이클 훅]
-     * 스프링이 켜지면서 @Value 주입을 완전히 마친 직후, 문자열을 Path 객체로 안전하게 변환
+     * 폴더 내 일반 파일 개수 카운트
      */
-    @PostConstruct
-    public void init() {
-        this.nfsRootPath = Paths.get(baseStoragePath).normalize();
-        log.info("StorageService 가동 - 설정된 NFS 루트 경로: {}", this.nfsRootPath);
+    private int getFileCount(Path path) {
+        if (Files.notExists(path)) return 0;
+        try (var stream = Files.walk(path)) {
+            return (int) stream.filter(Files::isRegularFile).count();
+        } catch (IOException e) {
+            return 0;
+        }
     }
 
     /**
@@ -299,19 +290,27 @@ public class StorageService {
             List<Path> allPaths = stream
                     .filter(path -> !path.equals(projectFolderPath))
                     .filter(path -> {
+                        // 윈도우 환경대응을 위해 백슬래시를 전면 슬래시로 교정
                         String relativeStr = projectFolderPath.relativize(path).toString().replace("\\", "/");
 
-                        // yml 장부에 등록된 폴더명(ex: .git, .idea, node_modules) 중 하나라도 경로에 속해 있다면 탈락
-                        boolean isIgnored = ignoreDirs.stream().anyMatch(ignoreDir ->
-                                !ignoreDir.isBlank() && (
-                                        relativeStr.startsWith(ignoreDir + "/") ||
-                                                relativeStr.contains("/" + ignoreDir + "/")
-                                )
-                        );
+                        // "gradlew"가 ".gradle" 폴더명에 휩쓸려 삭제되는 contains() 버그 방어선
+                        // 경로를 디렉토리 단위 배열로 쪼개어 '정확히 단어 전체가 일치'하는지 검사합니다.
+                        String[] pathParts = relativeStr.split("/");
+
+                        boolean isIgnored = ignoreDirs.stream().anyMatch(ignoreDir -> {
+                            if (ignoreDir.isBlank()) return false;
+
+                            for (String part : pathParts) {
+                                if (part.equals(ignoreDir)) {
+                                    return true; // 제외 타겟 폴더명과 100% 완전히 일치하는 구역만 걸러냅니다.
+                                }
+                            }
+                            return false;
+                        });
 
                         if (isIgnored) return false;
 
-                        // 파일명 자체가 "." 이거나 ".." 인 리눅스 시스템 폴더 기호가 아니라면 다 허용 (.gitignore 등은 생존)
+                        // 파일명 자체가 "." 이거나 ".." 인 리눅스 시스템 폴더 기호 기각 (.gitignore 등은 정상 생존)
                         String fileName = path.getFileName().toString();
                         return !fileName.equals(".") && !fileName.equals("..");
                     })
@@ -320,7 +319,7 @@ public class StorageService {
             // 리액트 트리 뷰용 노드 데이터 조립
             List<ProjectNode> nodes = allPaths.stream()
                     .map(path -> {
-                        String relativePath = projectFolderPath.relativize(path).toString();
+                        String relativePath = projectFolderPath.relativize(path).toString().replace("\\", "/");
                         String type = Files.isDirectory(path) ? "DIR" : "FILE";
                         return new ProjectNode(relativePath, type);
                     })
@@ -390,7 +389,7 @@ public class StorageService {
         }
 
         try {
-            // 2. 물리 저장소 절대 경로 조립 (/app/storage/userdir/{userId}/{projectUuid}/{relativePath})
+            // 2. 물리 저장소 절대 경로 조립
             Path rootPath = Paths.get(baseStoragePath).normalize();
             Path targetFilePath = rootPath
                     .resolve(String.valueOf(user.getId()))
@@ -409,15 +408,25 @@ public class StorageService {
                 throw new IllegalArgumentException("파일을 찾을 수 없거나 올바른 파일 포맷이 아닙니다.");
             }
 
+            // [교정 핵심]: 바이너리 파일 차단 Guard 설정
+            // .jar, .class, .png 등 텍스트로 읽을 수 없는 확장자는 사전에 걸러내어 에러를 방지합니다.
+            String fileName = targetFilePath.getFileName().toString().toLowerCase();
+            if (fileName.endsWith(".jar") || fileName.endsWith(".class") || fileName.endsWith(".zip")) {
+                return "[Binary File] 다운로드만 가능한 바이너리 파일입니다. 에디터에서 내용을 표시할 수 없습니다.";
+            }
+
             // 4. NFS 디스크에서 진짜 소스 코드 텍스트 긁어오기
             return Files.readString(targetFilePath, java.nio.charset.StandardCharsets.UTF_8);
 
+        } catch (java.nio.charset.MalformedInputException e) {
+            //[인프라 가드]: 만약 확장자 체크를 놓친 다른 이진 파일이 들어와도 서버가 터지지 않게 예외 격리
+            log.warn("[StorageService] 인코딩 오류 - 텍스트 파일이 아닙니다. Path: {}", path);
+            return "[Binary File] 인코딩할 수 없는 파일 포맷입니다.";
         } catch (IOException e) {
             log.error("NFS 파일 읽기 실패 - UUID: {}, Path: {}", uuid, path, e);
             throw new RuntimeException("파일 시스템에서 내용을 읽어오지 못했습니다.", e);
         }
     }
-
 
     /**
      * 프레임워크 통계 반환
@@ -454,5 +463,55 @@ public class StorageService {
         return new FrameworkStatisticsResponse(totalCount, frameworkCounts);
     }
 
+    /**
+     * 유저의 전체 스토리지 사용량 조회 (NFS 디스크 스캔 X, DB 초고속 합산)
+     */
+    @Transactional(readOnly = true)
+    public long getUserTotalStorageUsage(User user) {
+        // DB 에 적힌 프로젝트 용량만 합산해서 즉시 리턴합니다.
+        return projectRepository.getTotalStorageSizeByUser(user);
+    }
+
+    // 헬퍼 메서드  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    // 폴더 내부까지 재귀적으로 삭제하는 헬퍼 메서드
+    private void deleteDirectoryRecursive(Path path) {
+        if (Files.exists(path)) {
+            try (var walk = Files.walk(path)) {
+                walk.sorted(java.util.Comparator.reverseOrder()) // 하위 파일부터 삭제
+                        .map(Path::toFile)
+                        .forEach(java.io.File::delete);
+            } catch (IOException e) {
+                throw new RuntimeException("물리적 폴더 삭제 실패: " + path, e);
+            }
+        }
+    }
+
+    // 오류 발생 시 uuid 기반 폴더 삭제
+    private void deleteDirectory(Path path) {
+        try {
+            if (Files.exists(path)) {
+                Files.walk(path)
+                        .sorted(Comparator.reverseOrder())
+                        .forEach(p -> {
+                            try { Files.delete(p); }
+                            catch (IOException ignored) {}
+                        });
+            }
+        } catch (IOException e) {
+            log.error("폴더 삭제 실패: {}", path, e);
+        }
+    }
+
+    // AI모델 선택 예외 처리
+    private AiModel resolveModel(User user, String requestModel) {
+        // 1. 요청 모델명 → 2. 유저 기본 모델 → 3. 시스템 기본 모델 순으로 탐색
+        return Optional.ofNullable(requestModel)
+                .filter(m -> !m.isBlank())
+                .flatMap(aiModelRepository::findByModelNameAndIsActiveTrue)
+                .or(() -> Optional.ofNullable(user.getModel()))
+                .or(() -> aiModelRepository.findByDefaultActiveTrue())
+                .orElseThrow(() -> new IllegalStateException("사용 가능한 AI 모델이 시스템에 존재하지 않습니다."));
+    }
 
 }

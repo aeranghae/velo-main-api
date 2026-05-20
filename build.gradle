@@ -51,11 +51,19 @@ dependencies {
 
     // JWT 토큰 관련 라이브러리
     implementation 'io.jsonwebtoken:jjwt-api:0.12.5'
-    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.5'
 
     // redis
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    // 1. 웹소켓 기능을 위한 의존성
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
+    // 2. Docker Java API 관련 의존성
+    implementation 'com.github.docker-java:docker-java-core:3.7.1'
+    implementation 'com.github.docker-java:docker-java-transport-httpclient5:3.7.1'
+
 }
 
 tasks.named('test') {

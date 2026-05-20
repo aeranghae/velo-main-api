@@ -56,7 +56,7 @@ public class Project {
     private List<ProjectNode> fileNodes = new ArrayList<>();
 
     @Builder
-    public Project(String name, String description, String uuid, String framework, User user, AiModel model) {
+    public Project(String name, String description, String uuid, String framework, User user, AiModel model, String status) {
         this.name = name;
         this.description = description;
         this.uuid = uuid;

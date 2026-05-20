@@ -23,27 +23,41 @@ spec:
         app: velo-main-api
     spec:
       containers:
-      - name: main-api
-        image: oxxultus/velo-main-api:latest
-        imagePullPolicy: Always
-        
-        ports:
-        - containerPort: 8080
-          name: http
-        
-        volumeMounts:
-        - name: config-volume
-          mountPath: /app/config
-        
-        # 중요: NFS 스토리지는 ReadWriteMany(RWX) 정책을 쓰기 때문에
-        # 3개의 스프링 부트 팟이 동시에 같은 폴더에 파일을 읽고 써도 충돌 나지 않고 완벽히 공유
-        - name: velo-nfs-volume
-          mountPath: /app/storage
+        - name: main-api
+          image: oxxultus/velo-main-api:latest
+          imagePullPolicy: Always
+
+          # [보안 설정 추가] 호스트 컴퓨터의 유닉스 소켓 파일을 핸들링할 수 있는 권한 부여
+          securityContext:
+            privileged: true
+
+          ports:
+            - containerPort: 8080
+              name: http
+
+          volumeMounts:
+            - name: config-volume
+              mountPath: /app/config
+
+            # 중요: NFS 스토리지는 ReadWriteMany(RWX) 정책을 쓰기 때문에
+            # 3개의 스프링 부트 팟이 동시에 같은 폴더에 파일을 읽고 써도 충돌 나지 않고 완벽히 공유
+            - name: velo-nfs-volume
+              mountPath: /app/storage
+
+            # [추가] 파드 내부 공간으로 도커 소켓 링크 연결
+            - name: docker-socket-volume
+              mountPath: /var/run/docker.sock
 
       volumes:
-      - name: config-volume
-        secret:
-          secretName: velo-config
-      - name: velo-nfs-volume
-        persistentVolumeClaim:
-          claimName: velo-storage-pvc
+        - name: config-volume
+          secret:
+            secretName: velo-config
+        - name: velo-nfs-volume
+          persistentVolumeClaim:
+            claimName: velo-storage-pvc
+
+        # [추가] 미니 PC 호스트의 실제 도커 소켓 파일 위치를 볼륨원으로 정의
+        - name: docker-socket-volume
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket

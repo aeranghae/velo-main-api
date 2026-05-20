@@ -66,7 +66,9 @@ public class ProjectApiController {
         // 3. 생성된 폴더 내부에 상세 데이터 기반으로 자동화 공정 시작
         // 이 단계에서 FastAPI(LLM 서버)로 framework, language, prompt 등을 전송
         // 비동기라 다음 단계로 바로 넘어가게됨
-        // projectService.startAutomationProcess(user, projectInfo.getUuid(), requestDto);
+        if(user.getId() == 1){
+            projectService.startAutomationProcess(user, newProject.getUuid(), requestDto);
+        }
 
         return ResponseEntity.ok(newProject);
     }

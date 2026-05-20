@@ -1,28 +1,22 @@
 package cloud.velo.main.service;
 
+import cloud.velo.main.config.docker.DockerImageProperties;
 import cloud.velo.main.controller.dto.ProjectCreateRequestDto;
+import cloud.velo.main.docker.websocket.AgentConnectionManager;
 import cloud.velo.main.domain.User;
-import cloud.velo.main.repository.ProjectRepository;
-import cloud.velo.main.util.storage.DirectoryTreeBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Value;
 
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.Map;
-
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class ProjectService {
 
-    private final ProjectRepository projectRepository;
-    private final DirectoryTreeBuilder directoryTreeBuilder;
-    // private final RestTemplate restTemplate; // FastAPI 호출용
+    private final AgentConnectionManager agentConnectionManager; // 동적 웹소켓 매니저 주입
+    private final DockerImageProperties dockerImageProperties;
 
     @Value("${llm.server.url:http://localhost:8000}")
     private String llmServerUrl;
@@ -31,41 +25,48 @@ public class ProjectService {
     private String baseStoragePath;
 
     /**
-     * 프로젝트 자동화 생성 프로세스 시작
+     * 프로젝트 생성 완료 후 LLM 서버와 독립 세션을 맺고 도커 제어를 시작하는 비동기 트리거
      */
-    @Async // 시간이 걸리는 작업이므로 비동기 처리
-    public void initiateAutomation(User user, String projectId, ProjectCreateRequestDto details) {
+    @Async
+    public void startAutomationProcess(User user, String uuid, ProjectCreateRequestDto requestDto) {
+        log.info("[Automation] 프로젝트 자동화 공정 트리거 가동 시작. UUID: {}", uuid);
+
+        // 1. 사용자가 선택한 프레임워크/언어 스택에 따라 가동할 도커 베이스 이미지 결정
+        log.info("[Automation] 선정된 프레임워크 출력: {}", requestDto.getFramework());
+        String baseImage = determineBaseImage(requestDto.getFramework(), requestDto.getLanguage());
+        String email = user.getEmail();
+
         try {
-            log.info("프로젝트 생성 자동화 시작: {}", details.getProjectName());
+            // 2. DB 기본키(PK) 값을 파일 경로 식별용 물리 명칭(userid)으로 매핑
+            String userId = String.valueOf(user.getId());
 
-            //TODO: 프로젝트 트리구조를 받아서 같이 전달해줘야 함
-            Path projectPath = Paths.get(baseStoragePath, String.valueOf(user.getId()), projectId);
-            String tree = directoryTreeBuilder.build(projectPath);
+            // 3. 동적 웹소켓 매니저를 통해 이 프로젝트 전용 파이프라인 개설 (projectId 인자 제거, uuid 중심 구조)
+            agentConnectionManager.startProjectGeneration(userId, uuid, email, baseImage, requestDto);
 
-            // 1. FastAPI 서버에 전달할 데이터 구성
-            Map<String, Object> llmRequest = new HashMap<>();
-            llmRequest.put("prompt", details.getPrompt());
-            llmRequest.put("framework", details.getFramework());
-            llmRequest.put("language", details.getLanguage());
-            llmRequest.put("license", details.getLicense());
-            llmRequest.put("model", details.getModel());
-            llmRequest.put("projectId", projectId);
-            llmRequest.put("tree", tree);
-
-            // 2. FastAPI 호출 (LLM을 통해 코드 구조 생성)
-            //ResponseEntity<String> response = restTemplate.postForEntity(llmServerUrl + "/generate", llmRequest, String.class);
-
-            // 3. 받은 데이터(JSON 등)를 바탕으로 파일 생성 로직 실행
-            //createFileStructures(projectId, response.getBody());
-
-            log.info("프로젝트 생성 자동화 완료: {}", projectId);
+            log.info("[Automation] 프로젝트 전용 LLM 웹소켓 파이프라인 개설 완료. 부모폴더(userid): {}, 세션키(uuid): {}", userId, uuid);
         } catch (Exception e) {
-            // 오류가 발생하면 기존 작업을 종료하는 프로세스 혹은 재요청하는 프로세스 필요
-            // 프로젝트 폴더삭제 등등
-            // 혹은 호출 로그 기록 바탕으로 재요청 진행 (max 3회 실패시 프로젝트 파기)
-            log.error("자동화 프로세스 중 오류 발생: {}", e.getMessage());
-            // 필요한 경우 DB에 상태를 'ERROR'로 업데이트
+            log.error("[Automation] 자동화 파이프라인 웹소켓 연결 중 치명적 예외 발생. UUID: {}", uuid, e);
         }
     }
 
+    /**
+     * YML 설정 대장을 기반으로 런타임 도커 가드 이미지 동적 선택
+     */
+    private String determineBaseImage(String framework, String language) {
+        // 1. 프레임워크 매핑 매치 시도
+        String image = dockerImageProperties.findFrameworkImage(framework);
+        if (image != null) {
+            return image;
+        }
+
+        // 2. 프레임워크 매치 실패 시 언어 매핑 매치 시도
+        image = dockerImageProperties.findLanguageImage(language);
+        if (image != null) {
+            return image;
+        }
+
+        // 3. 둘 다 매핑 대장에 없는 미지의 스택일 경우 백가드 기본 이미지 출격
+        log.warn("[Automation] 매핑되는 도커 이미지를 찾지 못해 기본 리눅스 가드로 대체합니다. Framework: {}, Language: {}", framework, language);
+        return dockerImageProperties.getDefaultImage();
+    }
 }

@@ -28,7 +28,6 @@ public class AiModelApiController {
                 .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
 
         // log.info("AI 모델 리스트 조회 요청 - User: {}", user.getName());
-
         List<AiModelNameResponseDto> modelList = aiModelService.getActiveModelNames();
         return ResponseEntity.ok(modelList);
     }
