@@ -205,6 +205,7 @@ public class DockerAgentService {
         // 3. 컨테이너 생성 및 자원 격리 제한선(자드가 가동) 설정
         CreateContainerResponse container = dockerClient.createContainerCmd(baseImage)
                 .withName("agent-sandbox-" + uuid)
+                .withWorkingDir("/workspace")
                 .withHostConfig(HostConfig.newHostConfig()
                         .withBinds(bind)
                         .withCpuQuota(100000L)   // 1코어 제한

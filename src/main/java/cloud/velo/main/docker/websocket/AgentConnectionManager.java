@@ -49,7 +49,7 @@ public class AgentConnectionManager {
         // 2. 이 세션(UUID)만을 전용으로 담당할 독립된 웹소켓 핸들러 객체 생성
         LlmAgentClient dynamicHandler = new LlmAgentClient(dockerAgentService, objectMapper, storageService, userId, uuid, email, baseImage, requestDto);
 
-        // 3. ⭐️ 하드코딩 제거: 주입받은 serverUrl 변수를 뼈대로 동적 URL 구성
+        // 3. 하드코딩 제거: 주입받은 serverUrl 변수를 뼈대로 동적 URL 구성
         // serverUrl 값 끝에 '/' 유무에 대비해 유연하게 붙도록 처리 가능 (예: serverUrl이 ws://localhost:8000 일 때)
         String cleanedUrl = serverUrl.endsWith("/") ? serverUrl.substring(0, serverUrl.length() - 1) : serverUrl;
         String fastapiWsUrl = String.format("%s/agent?uuid=%s", cleanedUrl, uuid);

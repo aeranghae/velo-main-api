@@ -94,7 +94,9 @@ public class LlmAgentClient extends TextWebSocketHandler {
 
         AiModelMessage.Action action = objectMapper.readValue(payload, AiModelMessage.Action.class);
         AiModelMessage.Observation observation;
-
+        
+        
+        
         // 2. 도구(Tool) 매핑 분기문
         if ("WRITE_FILE".equals(action.getTool())) {
             try {
