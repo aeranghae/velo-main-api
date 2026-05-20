@@ -136,14 +136,14 @@ public class ProjectLogService {
 
                 List<ProjectLog> bulkLogEntities = new ArrayList<>();
                 for (String raw : rawLogs) {
-                    String[] parts = raw.split("\\|\\|", 2);
+                    String[] parts = raw.split("\\|\\|", 3);
                     bulkLogEntities.add(ProjectLog.builder()
                             .user(owner)
                             .project(project)
                             .logLevel(parts[0])
                             .status(incomingStatus)
                             .createdAt(LocalDateTime.parse(parts[1]))
-                            .message(parts[1])
+                            .message(parts[2])
                             .build());
                 }
 
