@@ -54,6 +54,7 @@ public class LlmAgentClient extends TextWebSocketHandler {
      */
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+
         log.info("[소켓-{}] FastAPI 연결 수립 완료. 샌드박스 컨테이너를 선제 가동합니다. 이미지: {}", uuid, baseImage);
         this.registeredContainerId = dockerAgentService.startSandbox(userId, uuid, baseImage);
 
