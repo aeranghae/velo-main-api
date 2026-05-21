@@ -9,7 +9,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import cloud.velo.main.config.auth.JwtTokenProvider;
 
 @RestController
 @RequestMapping("/api/projects")
@@ -17,7 +16,6 @@ import cloud.velo.main.config.auth.JwtTokenProvider;
 public class ProjectLogController {
 
     private final ProjectLogService projectLogService;
-    private final JwtTokenProvider jwtTokenProvider;
 
     /*
      * 클라이언트(리액트) 전용 로그 조회 API
@@ -35,13 +33,9 @@ public class ProjectLogController {
     @GetMapping(value = "/{uuid}/logs/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamProjectLogs(
             @PathVariable("uuid") String uuid,
-            @RequestParam("token") String token) {
-        if (token == null || !jwtTokenProvider.validateToken(token)) {
-            throw new IllegalArgumentException("유효하지 않거나 만료된 토큰입니다.");
-        }
-
-        // 2. 진짜 토큰이 맞으면 안에 들어있는 이메일을 안전하게 꺼냄
-        String email = jwtTokenProvider.getUserEmail(token);
+            @AuthenticationPrincipal UserDetails userDetails) {
+        // 1. Spring Security 컨텍스트에서 안전하게 이메일 추출
+        String email = userDetails.getUsername();
 
         // 3. 추출한 이메일로 SSE 연결 생성
         return projectLogService.createSseConnection(uuid, email);

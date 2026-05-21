@@ -43,8 +43,6 @@ public class SecurityConfig {
                     auth.requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll();
                     auth.requestMatchers("/api/auth/google").permitAll();
 
-                    auth.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/projects/*/logs/stream").permitAll();
-
                     // LLM 서버 경로 permitAll (IP 검증은 IpWhitelistFilter가 담당)
                     llmAllowedPaths.forEach(path ->
                             auth.requestMatchers(path + "/**").permitAll()

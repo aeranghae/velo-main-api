@@ -38,6 +38,7 @@ public class ProjectLogService {
 
     // 시간 포멧터
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
+    private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     /**
      * 1. 과거 로그 전체 조회 (DB 데이터 + Redis 임시 버퍼 데이터 실시간 병합 서빙)
@@ -72,7 +73,7 @@ public class ProjectLogService {
                 if (parts.length < 3) continue;
 
                 // ISO 표준 시간을 포멧터로 지정
-                String timeStr = LocalDateTime.parse(parts[1]).format(TIME_FORMATTER);
+                String timeStr = LocalDateTime.parse(parts[1], ISO_FORMATTER).format(TIME_FORMATTER);
                 logBuilder.append(String.format("[%s][%s] %s\n", parts[0], timeStr, parts[2]));
             }
         }
@@ -94,7 +95,7 @@ public class ProjectLogService {
         String redisKey = "project:logs:" + uuid;
 
         // 로그 발생 시점 서버 시간
-        String createdAtStr = LocalDateTime.now().toString();
+        String createdAtStr = LocalDateTime.now().format(ISO_FORMATTER);
 
         // 1. Redis 버퍼 리스트에 실시간 적재 (LEVEL||TIME||MESSAGE)
         String logLine = dto.getLogLevel() + "||" + createdAtStr + "||" + dto.getMessage();
@@ -137,12 +138,15 @@ public class ProjectLogService {
                 List<ProjectLog> bulkLogEntities = new ArrayList<>();
                 for (String raw : rawLogs) {
                     String[] parts = raw.split("\\|\\|", 3);
+
+                    LocalDateTime createdAt = LocalDateTime.parse(parts[1],ISO_FORMATTER);
+
                     bulkLogEntities.add(ProjectLog.builder()
                             .user(owner)
                             .project(project)
                             .logLevel(parts[0])
                             .status(incomingStatus)
-                            .createdAt(LocalDateTime.parse(parts[1]))
+                            .createdAt(createdAt)
                             .message(parts[2])
                             .build());
                 }
