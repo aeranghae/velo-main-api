@@ -85,7 +85,7 @@ public class LlmAgentClient extends TextWebSocketHandler {
         Map<String, Object> initialPrompt = initialPromptBuilder();
         if(initialPrompt == null) {
             // 완료했다면 COMPLETED
-            this.finalProjectStatus = "FAILED";
+            this.finalProjectStatus = ProjectStatus.FAILED;
 
             // TODO: 프로젝트 테이블 상태 관리 객체를 호출해 프로젝트 상태를 'FAILED'로 변경하는 비즈니스 로직을 여기에 연동
 

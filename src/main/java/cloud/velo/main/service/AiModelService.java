@@ -1,5 +1,6 @@
 package cloud.velo.main.service;
 
+import cloud.velo.main.component.RateLimiterService;
 import cloud.velo.main.controller.dto.AiModelNameResponseDto;
 import cloud.velo.main.controller.dto.ProjectArchitectureResponse;
 import cloud.velo.main.domain.AiModel;
@@ -76,11 +77,15 @@ public class AiModelService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
+        if(user.getId() != 1 && user.getId() != 2){
+            return null;
+        }
+
 
         String fastApiUrl = serverUrl + "/api/llm/architecture";
 
         // FastAPI로 넘겨줄 JSON 요청 바디 구성
-        Map<String, String> requestBody = Map.of("idea", userIdea); //변경 가능
+        Map<String, String> requestBody = Map.of("description", userIdea);
 
         // FastAPI 연동 실행 및 DTO 매핑 리턴
         return restClient.post()

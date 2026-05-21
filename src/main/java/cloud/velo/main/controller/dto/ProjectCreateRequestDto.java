@@ -15,6 +15,7 @@ public class ProjectCreateRequestDto {
     private String framework;        // React, Spring Boot 등 (*제거예정)
     private String language;         // Java, TypeScript, Python 등 (*제거예정)
 
+    private String artifact;
     private String architecture_type; // FULL_STACK, CLIENT_SERVER
 
     private String fullstack_framework;

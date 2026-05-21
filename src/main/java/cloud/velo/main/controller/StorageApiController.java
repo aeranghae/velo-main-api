@@ -93,6 +93,20 @@ public class StorageApiController {
         return ResponseEntity.ok(projects);
     }
 
+    // 개인 저장소 내 프로젝트 폴더 리스트 반환 (상세 정보 포함)
+    @GetMapping("/projects/{uuid}/update")
+    public ResponseEntity<ProjectResponseDto> updateProjectDetail(
+            @PathVariable String uuid,
+            @AuthenticationPrincipal String email) {
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
+
+        ProjectResponseDto projectDetail = storageService.updateUserProjectDetails(uuid, user);
+
+        return ResponseEntity.ok(projectDetail);
+    }
+
     // 프로젝트 파일 트리 구조 조회
     // URL 예시: GET /api/storage/projects/v-uuid-123/tree
     @GetMapping("/projects/{uuid}/tree")
