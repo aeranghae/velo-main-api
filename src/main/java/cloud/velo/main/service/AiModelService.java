@@ -84,7 +84,7 @@ public class AiModelService {
         String fastApiUrl = serverUrl + "/api/llm/architecture";
 
         // FastAPI로 넘겨줄 JSON 요청 바디 구성
-        Map<String, String> requestBody = Map.of("idea", userIdea); //변경 가능
+        Map<String, String> requestBody = Map.of("description", userIdea);
 
         // FastAPI 연동 실행 및 DTO 매핑 리턴
         return restClient.post()
