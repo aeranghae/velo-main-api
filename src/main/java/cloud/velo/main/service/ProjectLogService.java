@@ -69,12 +69,12 @@ public class ProjectLogService {
         List<String> bufferedLogs = redisTemplate.opsForList().range(redisKey, 0, -1);
         if (bufferedLogs != null) {
             for (String raw : bufferedLogs) {
-                String[] parts = raw.split("\\|\\|", 3); // 🌟 3파트로 파싱
-                if (parts.length < 3) continue;
+                String[] parts = raw.split("\\|\\|", 4); // 🌟 4파트로 파싱
+                if (parts.length < 4) continue;
 
                 // ISO 표준 시간을 포멧터로 지정
                 String timeStr = LocalDateTime.parse(parts[1], ISO_FORMATTER).format(TIME_FORMATTER);
-                logBuilder.append(String.format("[%s][%s] %s\n", parts[0], timeStr, parts[2]));
+                logBuilder.append(String.format("[%s][%s] %s\n", parts[0], timeStr, parts[3]));
             }
         }
 
@@ -97,12 +97,6 @@ public class ProjectLogService {
         // 로그 발생 시점 서버 시간
         String createdAtStr = LocalDateTime.now().format(ISO_FORMATTER);
 
-        // 1. Redis 버퍼 리스트에 실시간 적재 (LEVEL||TIME||MESSAGE)
-        String logLine = dto.getLogLevel() + "||" + createdAtStr + "||" + dto.getMessage();
-        redisTemplate.opsForList().rightPush(redisKey, logLine);
-
-
-        SseEmitter emitter = emitters.get(uuid);
 
         ProjectStatus incomingStatus = ProjectStatus.CREATED;
         if (dto.getStatus() != null) {
@@ -110,9 +104,16 @@ public class ProjectLogService {
                 incomingStatus = ProjectStatus.valueOf(dto.getStatus().toUpperCase());
             } catch (IllegalArgumentException e) {
                 log.warn("정의되지 않은 상태 값이 수신되었습니다: {}", dto.getStatus());
-                return; // 잘못된 상태가 들어오면 즉시 차단
+                return;
             }
         }
+
+        // Redis 버퍼 리스트에 실시간 적재 시 STATUS(incomingStatus)도 같이 4파트로 조립해서 저장!
+        String logLine = dto.getLogLevel() + "||" + createdAtStr + "||" + incomingStatus.name() + "||" + dto.getMessage();
+        redisTemplate.opsForList().rightPush(redisKey, logLine);
+
+
+        SseEmitter emitter = emitters.get(uuid);
 
         if (emitter != null) {
             try {
@@ -120,7 +121,6 @@ public class ProjectLogService {
                 emitter.send(SseEmitter.event()
                         .name("log-stream")
                         .data(logLine));
-
             } catch (Exception e) {
                 emitters.remove(uuid);
             }
@@ -137,17 +137,19 @@ public class ProjectLogService {
 
                 List<ProjectLog> bulkLogEntities = new ArrayList<>();
                 for (String raw : rawLogs) {
-                    String[] parts = raw.split("\\|\\|", 3);
+                    String[] parts = raw.split("\\|\\|", 4);
 
                     LocalDateTime createdAt = LocalDateTime.parse(parts[1],ISO_FORMATTER);
+
+                    ProjectStatus rowStatus = ProjectStatus.valueOf(parts[2]);
 
                     bulkLogEntities.add(ProjectLog.builder()
                             .user(owner)
                             .project(project)
                             .logLevel(parts[0])
-                            .status(incomingStatus)
+                            .status(rowStatus)
                             .createdAt(createdAt)
-                            .message(parts[2])
+                            .message(parts[3])
                             .build());
                 }
 
@@ -186,4 +188,13 @@ public class ProjectLogService {
 
         return emitter;
     }
+    /**
+     * 4. 프로젝트 삭제 전 외래키 제약조건을 원천 차단하기 위해 자식 로그들을 선제 삭제
+     */
+    @Transactional
+    public void deleteLogsByProjectId(Long projectId) {
+        log.info("[System] 프로젝트(ID: {}) 삭제 요청 감지. 연관된 모든 자식 로그 데이터를 먼저 제거합니다.", projectId);
+        projectLogRepository.deleteByProjectId(projectId);
+    }
+
 }

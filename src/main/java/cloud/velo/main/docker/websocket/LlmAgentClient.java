@@ -75,12 +75,20 @@ public class LlmAgentClient extends TextWebSocketHandler {
         log.info("[소켓-{}] FastAPI 연결 수립 완료. 샌드박스 컨테이너를 선제 가동합니다. 이미지: {}", uuid, baseImage);
 
         // 샌드 박스 가동 알림 로그 추가
-        sendSystemLog("INFO", "AI 에이전트 연결 수립 완료. 격리 구역(Sandbox) 가동을 개시합니다.", ProjectStatus.ANALYZING);
-
+        sendSystemLog("INFO", "AI 에이전트 연결 수립 완료. 격리 구역(Sandbox) 가동을 개시합니다.", ProjectStatus.INIT);
         this.registeredContainerId = dockerAgentService.startSandbox(userId, uuid, baseImage);
 
         // 로그 추가 샌드 박스 배정 완료 로그
-        sendSystemLog("INFO", "[System] 격리 구역 배정 완료. 자율 코딩 루프를 개시합니다.", ProjectStatus.ANALYZING);
+        sendSystemLog("INFO", "[System] 격리 구역 배정 완료. 자율 코딩 루프를 개시합니다.", ProjectStatus.INIT);
+
+        sendSystemLog("INFO", "[System] 자율 공정 작업 공간 할당: 프로젝트 작업 디렉토리(/workspace) 생성을 완료했습니다.", ProjectStatus.PROVISIONING);
+        sendSystemLog("INFO", "[System] 초기 기본 아키텍처 스켈레톤 및 프로토타입 컨텍스트 빌드를 준비합니다.", ProjectStatus.PROVISIONING);
+
+        if (hasValue(requestDto.getLicense())) {
+            sendSystemLog("INFO", "[25%] 오픈소스 정책 반영: 선택된 라이선스([" + requestDto.getLicense() + "]) 명세서 파일 생성을 자동 스케줄링합니다.", ProjectStatus.CONFIGURING);
+        } else {
+            sendSystemLog("WARN", "[25%] 경고: 선택된 오픈소스 라이선스가 없습니다. 기본 보안 환경으로 설정을 지속합니다.", ProjectStatus.CONFIGURING);
+        }
 
         Map<String, Object> initialPrompt = initialPromptBuilder();
         if(initialPrompt == null) {

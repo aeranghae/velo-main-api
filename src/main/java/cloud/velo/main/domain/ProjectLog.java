@@ -43,7 +43,7 @@ public class ProjectLog {
         this.user = user;
         this.project = project;
         this.logLevel = (logLevel != null) ? logLevel : "INFO";
-        this.status = (status != null) ? status : ProjectStatus.GENERATING;
+        this.status = (status != null) ? status : ProjectStatus.CREATED;
         this.message = message;
         this.createdAt = (createdAt != null) ? createdAt : LocalDateTime.now();
     }
