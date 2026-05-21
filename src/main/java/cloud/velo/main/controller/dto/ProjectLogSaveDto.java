@@ -7,8 +7,8 @@ import lombok.Setter;
 @Getter
 @Setter
 public class ProjectLogSaveDto {
-    private String uuid;
-    private String logLevel;
+    private String uuid; // 사용자의 아이디
+    private String logLevel; // info / debug / error
     private String message;
-    private String status;
+    private String status;  // GENERATING, COMPLETED, FAILED
 }
