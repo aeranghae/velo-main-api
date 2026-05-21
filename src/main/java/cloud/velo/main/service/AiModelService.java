@@ -1,5 +1,6 @@
 package cloud.velo.main.service;
 
+import cloud.velo.main.component.RateLimiterService;
 import cloud.velo.main.controller.dto.AiModelNameResponseDto;
 import cloud.velo.main.controller.dto.ProjectArchitectureResponse;
 import cloud.velo.main.domain.AiModel;

@@ -64,6 +64,9 @@ dependencies {
     implementation 'com.github.docker-java:docker-java-core:3.7.1'
     implementation 'com.github.docker-java:docker-java-transport-httpclient5:3.7.1'
 
+    // 처리율 제한 알고리즘을 제공하는 bucket4j 라이브러리
+    implementation 'com.bucket4j:bucket4j_jdk17-core:8.18.0'
+
 }
 
 tasks.named('test') {
