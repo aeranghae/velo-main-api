@@ -15,7 +15,7 @@ public class NestJsTemplateInitializer extends BaseTemplateInitializer {
 
     @Override
     public void initTemplate(Path rootPath, ProjectCreateRequestDto dto) {
-        String projectName = dto.getProjectName().toLowerCase();
+        String projectName = dto.getArtifact().toLowerCase();
 
         createDirectories(rootPath, List.of(
                 "src/common/filters",

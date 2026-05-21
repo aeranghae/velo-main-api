@@ -23,7 +23,7 @@ public class SpringBootTemplateInitializer extends BaseTemplateInitializer {
 
     @Override
     public void initTemplate(Path rootPath, ProjectCreateRequestDto dto) {
-        String projectName = dto.getProjectName().toLowerCase();
+        String projectName = dto.getArtifact().toLowerCase();
         String basePath = "src/main/java/com/" + projectName;
 
         // 1. 디렉토리 구조 생성 (기존 폴더 구조에 gradle/wrapper 구역 추가)
