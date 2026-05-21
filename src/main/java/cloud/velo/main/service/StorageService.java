@@ -454,6 +454,31 @@ public class StorageService {
         return projectRepository.getTotalStorageSizeByUser(user);
     }
 
+    // 사용자 특정 Uuid 프로젝트 갱신
+    @Transactional(readOnly = true)
+    @CacheEvict(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
+    public ProjectResponseDto updateUserProjectDetails(String uuid, User user) {
+        // 앞서 안내해 드린 안전한 예외 처리 방식으로 변경하는 것을 추천합니다.
+        Project project = projectRepository.findByUuidAndUser(uuid, user)
+                .orElseThrow(() -> new IllegalArgumentException("해당 프로젝트를 찾을 수 없습니다."));
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+        return ProjectResponseDto.builder()
+                .projectName(project.getName())
+                .description(project.getDescription())
+                .status(project.getStatus().toString())
+                .uuid(project.getUuid())
+                .framework(project.getFramework())
+                .model(project.getModel().getModelName())
+                .createdAt(project.getCreatedAt().format(formatter))
+                .lastModified(project.getLastModifiedAt().format(formatter))
+                .size(project.getTotalSize())
+                .fileCount(project.getFileCount())
+                .build();
+    }
+
+
     // 헬퍼 메서드  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     // 폴더 내부까지 재귀적으로 삭제하는 헬퍼 메서드
