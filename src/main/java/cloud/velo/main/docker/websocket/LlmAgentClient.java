@@ -80,7 +80,7 @@ public class LlmAgentClient extends TextWebSocketHandler {
         this.registeredContainerId = dockerAgentService.startSandbox(userId, uuid, baseImage);
 
         // 로그 추가 샌드 박스 배정 완료 로그
-        sendSystemLog("INFO", "[System] 격리 구역 배정 완료. 자율 코딩 루프를 개시합니다.", ProjectStatus.GENERATING);
+        sendSystemLog("INFO", "[System] 격리 구역 배정 완료. 자율 코딩 루프를 개시합니다.", ProjectStatus.ANALYZING);
 
         Map<String, Object> initialPrompt = initialPromptBuilder();
         if(initialPrompt == null) {
@@ -97,7 +97,7 @@ public class LlmAgentClient extends TextWebSocketHandler {
         session.sendMessage(new TextMessage(objectMapper.writeValueAsString(initialPrompt)));
 
         // 로그 추가 루프 돌입 준비 완료 로그
-        sendSystemLog("INFO", "요구사항 분석 가동 완료. AI 자율 소스 코드 빌드 루프를 시작합니다.", ProjectStatus.GENERATING);
+        sendSystemLog("INFO", "요구사항 분석 가동 완료. AI 자율 소스 코드 빌드 루프를 시작합니다.", ProjectStatus.ANALYZING);
     }
 
     /**
@@ -115,7 +115,7 @@ public class LlmAgentClient extends TextWebSocketHandler {
             this.finalProjectStatus = ProjectStatus.FAILED;
 
             // 로그 추가 공정 제한 횟수 위험 알림
-            sendSystemLog("ERROR", "자율 공정 제한 횟수(" + MAX_TURN_LIMIT + "턴)를 초과하여 안전을 위해 시스템을 강제 종료합니다.", ProjectStatus.GENERATING);
+            sendSystemLog("ERROR", "자율 공정 제한 횟수(" + MAX_TURN_LIMIT + "턴)를 초과하여 안전을 위해 시스템을 강제 종료합니다.", ProjectStatus.FAILED);
 
             // 공정 실패 알림 전송 후 소켓 종료
             AiModelMessage.Observation errorObs = new AiModelMessage.Observation("OBSERVATION", "ERROR", 1, "", "MAX_TURN_LIMIT_EXCEEDED: 에이전트 루프가 너무 오래 지속되어 안전을 위해 강제 종료되었습니다.");
@@ -134,7 +134,7 @@ public class LlmAgentClient extends TextWebSocketHandler {
         // 2. 도구(Tool) 매핑 분기문
         if ("WRITE_FILE".equals(action.getTool())) {
             // [메인 로그추가] 파싱 완료된 정당한 시점 로그 생성 시작
-            sendSystemLog("INFO", "[Action] 소스 코드 파일 작성 중: " + action.getPath(), ProjectStatus.GENERATING);
+            sendSystemLog("INFO", "[Action] 소스 코드 파일 작성 중: " + action.getPath(), ProjectStatus.CODING);
 
             try {
                 dockerAgentService.writeFile(this.userId, this.uuid, action.getPath(), action.getContent());
@@ -143,51 +143,51 @@ public class LlmAgentClient extends TextWebSocketHandler {
                 // [세부 로그] 파일 작성 과정에서 도커 시스템이나 스크립트가 뱉은 상세 출력(stdout/stderr)이 있다면 연달아 준다
                 if (observation.getStdout() != null && !observation.getStdout().isEmpty()) {
                     for (String line : observation.getStdout().split("\n")) {
-                        sendSystemLog("DEBUG", line, ProjectStatus.GENERATING);
+                        sendSystemLog("DEBUG", line, ProjectStatus.CODING);
                     }
                 }
 
                 // [마무리 알림] 파일이 정상적으로 다 써졌음을 알림
-                sendSystemLog("INFO", "[Success] 파일 작성이 완료되었습니다: " + action.getPath(), ProjectStatus.GENERATING);
+                sendSystemLog("INFO", "[Success] 파일 작성이 완료되었습니다: " + action.getPath(), ProjectStatus.CODING);
             } catch (Exception e) {
                 log.error("[소켓-{}] 파일 작성 중 오류 발생", uuid, e);
                 observation = new AiModelMessage.Observation("OBSERVATION", "ERROR", 1, "", e.getMessage());
 
                 // [에러 로그]
-                sendSystemLog("ERROR", "[Fail] 파일 작성 실패: " + action.getPath() + " | Reason: " + e.getMessage(), ProjectStatus.GENERATING);
+                sendSystemLog("ERROR", "[Fail] 파일 작성 실패: " + action.getPath() + " | Reason: " + e.getMessage(), ProjectStatus.CODING);
             }
         }
         else if ("DELETE_FILE".equals(action.getTool())) {
 
             // [ 메인 로그 추ㅏㄱ] 파일 리팩토링 및 삭제
-            sendSystemLog("WARN", "[Action] 에이전트 리팩토링 - 파일 제거 요청 수신: " + action.getPath(), ProjectStatus.GENERATING);
+            sendSystemLog("WARN", "[Action] 에이전트 리팩토링 - 파일 제거 요청 수신: " + action.getPath(), ProjectStatus.CODING);
 
             try {
                 boolean isDeleted = dockerAgentService.deleteFile(this.userId, this.uuid, action.getPath());
                 if (isDeleted) {
                     observation = new AiModelMessage.Observation("OBSERVATION", "SUCCESS", 0, "파일 삭제 성공", "");
                     // [마무리 알림 - 파일 삭제]
-                    sendSystemLog("INFO", "[Success] 파일 삭제가 완료되었습니다: " + action.getPath(), ProjectStatus.GENERATING);
+                    sendSystemLog("INFO", "[Success] 파일 삭제가 완료되었습니다: " + action.getPath(), ProjectStatus.CODING);
                 } else {
                     observation = new AiModelMessage.Observation("OBSERVATION", "ERROR", 1, "", "파일 삭제 실패 (파일이 존재하지 않거나 잠겨있음)");
                    // [마무리 알림 - 삭제 실패]
-                    sendSystemLog("ERROR", "[Fail] 파일 삭제 실패 (파일 없음/잠김): " + action.getPath(), ProjectStatus.GENERATING);
+                    sendSystemLog("ERROR", "[Fail] 파일 삭제 실패 (파일 없음/잠김): " + action.getPath(), ProjectStatus.CODING);
                 }
             } catch (Exception e) {
                 log.error("[소켓-{}] 파일 삭제 중 오류 발생", uuid, e);
                 observation = new AiModelMessage.Observation("OBSERVATION", "ERROR", 1, "", e.getMessage());
                 // [에러 로그]
-                sendSystemLog("ERROR", "[Fail] 파일 삭제 중 오류: " + action.getPath() + " | Reason: " + e.getMessage(), ProjectStatus.GENERATING);
+                sendSystemLog("ERROR", "[Fail] 파일 삭제 중 오류: " + action.getPath() + " | Reason: " + e.getMessage(), ProjectStatus.CODING);
             }
         }
         else if ("EXECUTE_CMD".equals(action.getTool())) {
 
             // 로그 추가 어떤 쉘 명령어가 가동 되는지
-            sendSystemLog("INFO", "[Container] 샌드박스 내부 명령어 실행: " + action.getCmd(), ProjectStatus.GENERATING);
+            sendSystemLog("INFO", "[Container] 샌드박스 내부 명령어 실행: " + action.getCmd(), ProjectStatus.EXECUTING);
             if (this.registeredContainerId == null) {
                 observation = new AiModelMessage.Observation("OBSERVATION", "ERROR", 1, "", "샌드박스 컨테이너가 가동 중이 아닙니다.");
                 // [에러 로그 - 실행 불가]
-                sendSystemLog("ERROR", "[Fail] 샌드박스 미가동 상태로 명령어 실행 불가", ProjectStatus.GENERATING);
+                sendSystemLog("ERROR", "[Fail] 샌드박스 미가동 상태로 명령어 실행 불가", ProjectStatus.EXECUTING);
             } else {
                 observation = dockerAgentService.executeCommand(this.registeredContainerId, action.getCmd());
             }
@@ -195,17 +195,17 @@ public class LlmAgentClient extends TextWebSocketHandler {
             // [새부 로그] stdout - 도커의 표준 메시지 출력
             if (observation.getStdout() != null && !observation.getStdout().isEmpty()) {
                 for (String line : observation.getStdout().split("\n")) {
-                    sendSystemLog("DEBUG", line, ProjectStatus.GENERATING);
+                    sendSystemLog("DEBUG", line, ProjectStatus.EXECUTING);
                 }
             } // [새부 로그]  stderr 도커에서의 에러, 경고 메시지 출력
             if (observation.getStderr() != null && !observation.getStderr().isEmpty()) {
                 for (String line : observation.getStderr().split("\n")) {
-                    sendSystemLog("ERROR", line, ProjectStatus.GENERATING);
+                    sendSystemLog("ERROR", line, ProjectStatus.EXECUTING);
                 }
             }
 
             // [마무리 알림]
-            sendSystemLog("INFO", "[Success] 명령어 실행 완료: " + action.getCmd(), ProjectStatus.GENERATING);
+            sendSystemLog("INFO", "[Success] 명령어 실행 완료: " + action.getCmd(), ProjectStatus.EXECUTING);
         }
         else if ("FINISH".equals(action.getTool())) {
             log.info("[소켓-{}] FastAPI로부터 최종 공정 완료 신호(FINISH)를 수신했습니다.", uuid);
