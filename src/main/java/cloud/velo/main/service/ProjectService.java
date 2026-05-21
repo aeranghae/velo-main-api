@@ -32,8 +32,7 @@ public class ProjectService {
         log.info("[Automation] 프로젝트 자동화 공정 트리거 가동 시작. UUID: {}", uuid);
 
         // 1. 사용자가 선택한 프레임워크/언어 스택에 따라 가동할 도커 베이스 이미지 결정
-        log.info("[Automation] 선정된 프레임워크 출력: {}", requestDto.getFramework());
-        String baseImage = determineBaseImage(requestDto.getFramework(), requestDto.getLanguage());
+        String baseImage = setDockerImage(requestDto);
         String email = user.getEmail();
 
         try {
@@ -68,5 +67,47 @@ public class ProjectService {
         // 3. 둘 다 매핑 대장에 없는 미지의 스택일 경우 백가드 기본 이미지 출격
         log.warn("[Automation] 매핑되는 도커 이미지를 찾지 못해 기본 리눅스 가드로 대체합니다. Framework: {}, Language: {}", framework, language);
         return dockerImageProperties.getDefaultImage();
+    }
+
+    /**
+     * 분기별로 나누어서 도커 이미지 결정
+     */
+    private String setDockerImage(ProjectCreateRequestDto requestDto){
+        //  분기 검증
+        if ("FULL_STACK".equals(requestDto.getArchitecture_type())) {
+
+            // 하나의 프레임워크에서 풀스택으로 구현하는 경우
+            if (hasValue(requestDto.getFullstack_framework()) && !hasValue(requestDto.getBackend_framework()) && !hasValue(requestDto.getFrontend_framework())) {
+                log.info("[Automation] 선정된 프레임워크 출력: {}", requestDto.getFullstack_framework());
+                return determineBaseImage(requestDto.getFullstack_framework(), requestDto.getFullstack_language());
+            }
+            // 백엔드와 프론트엔드의 프레임워크 가 분리되어 풀스택으로 구현하는 경우
+            else if (!hasValue(requestDto.getFullstack_framework()) && hasValue(requestDto.getBackend_framework()) && hasValue(requestDto.getFrontend_framework())){
+                // TODO: 풀스택 중 백엔드+프론트 복합인 경우는 아직 사용 불가
+                return determineBaseImage("", ""); // 오류 방지를 위한 기본이미지 지정
+            }
+        }
+        else if ("CLIENT_SERVER".equals(requestDto.getArchitecture_type())) {
+
+            // 백엔드 프론트엔드 중 백엔드만 구현하는 경우
+            if (hasValue(requestDto.getBackend_framework()) && !hasValue(requestDto.getFrontend_framework())) {
+                log.info("[Automation] 선정된 프레임워크 출력: {}", requestDto.getBackend_framework());
+                return determineBaseImage(requestDto.getBackend_framework(), requestDto.getBackend_language());
+            }
+            // 백엔드 프론트 엔드 중 프론트엔드만 구현하는 경우
+            else if (!hasValue(requestDto.getBackend_framework()) && hasValue(requestDto.getFrontend_framework())) {
+                log.info("[Automation] 선정된 프레임워크 출력: {}", requestDto.getFrontend_framework());
+                return determineBaseImage(requestDto.getFrontend_framework(), requestDto.getFrontend_language());
+            }
+
+        }
+        return determineBaseImage("", ""); // 오류 방지를 위한 기본이미지 지정
+    }
+
+    /**
+     * 문자열이 null이 아니고 비어있지 않은지(공백 제외) 체크하는 가벼운 유틸 메서드
+     */
+    private boolean hasValue(String str) {
+        return str != null && !str.trim().isEmpty();
     }
 }

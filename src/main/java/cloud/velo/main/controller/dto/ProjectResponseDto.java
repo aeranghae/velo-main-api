@@ -14,8 +14,10 @@ public class ProjectResponseDto {
     private String description;
     private String status;
     private String uuid;          // 서버와 통신할 때 사용할 고유 식별자 (물리 폴더명)
+
     private String framework;
     private String model;
+
     private String createdAt;     // 프로젝트 생성일
     private String lastModified;  // 마지막 파일 수정일
     private long size;            // 프로젝트 총 용량 (Bytes)

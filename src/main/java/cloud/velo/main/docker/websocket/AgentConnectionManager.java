@@ -29,7 +29,7 @@ public class AgentConnectionManager {
     @Value("${velo.storage.path}")
     private String baseStoragePath; // 주입받은 기본 경로 활용
 
-    // ⭐️ 주입 문법 교정: 프로퍼티 값을 정상적으로 주입받기 위해 ${} 가드 추가
+    // 주입 문법 교정: 프로퍼티 값을 정상적으로 주입받기 위해 ${} 가드 추가
     @Value("${llm.server.ws:ws://localhost:8000}")
     private String serverUrl;
 
@@ -61,7 +61,7 @@ public class AgentConnectionManager {
                 projectLogService);
 
         // 3. 하드코딩 제거: 주입받은 serverUrl 변수를 뼈대로 동적 URL 구성
-        // serverUrl 값 끝에 '/' 유무에 대비해 유연하게 붙도록 처리 가능 (예: serverUrl이 ws://localhost:8000 일 때)
+        // serverUrl 값 끝에 '/' 유무에 대비해 유연하게 붙도록 처리 가능 (예: serverUrl이 ws://localhost:8000/agent?uuid=%s 일 때)
         String cleanedUrl = serverUrl.endsWith("/") ? serverUrl.substring(0, serverUrl.length() - 1) : serverUrl;
         String fastapiWsUrl = String.format("%s/agent?uuid=%s", cleanedUrl, uuid);
 

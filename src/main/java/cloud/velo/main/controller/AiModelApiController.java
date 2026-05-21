@@ -1,6 +1,8 @@
 package cloud.velo.main.controller;
 
 import cloud.velo.main.controller.dto.AiModelNameResponseDto;
+import cloud.velo.main.controller.dto.ProjectAnalysisRequest;
+import cloud.velo.main.controller.dto.ProjectArchitectureResponse;
 import cloud.velo.main.domain.User;
 import cloud.velo.main.repository.UserRepository;
 import cloud.velo.main.service.AiModelService;
@@ -54,5 +56,18 @@ public class AiModelApiController {
         }
     }
 
+    /**
+     * 사용자의 아이디어를 기반으로 AI 아키텍처 스택 추천 요청
+     * POST /api/storage/projects/analyze
+     */
+    @PostMapping("/projects/analyze")
+    public ResponseEntity<ProjectArchitectureResponse> analyzeProject(
+            @AuthenticationPrincipal String email,
+            @RequestBody ProjectAnalysisRequest request) {
+
+        // request 객체 내부에서 자바의 Getter로 아이디어 텍스트만 쏙 추출
+        ProjectArchitectureResponse response = aiModelService.analyzeProjectIdea(email, request.getIdea());
+        return ResponseEntity.ok(response);
+    }
 
 }

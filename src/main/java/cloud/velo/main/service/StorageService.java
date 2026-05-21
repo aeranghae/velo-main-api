@@ -25,7 +25,10 @@ import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.charset.MalformedInputException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -89,53 +92,32 @@ public class StorageService {
     @Transactional
     @CacheEvict(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
     public ProjectResponseDto createProject(User user, ProjectCreateRequestDto requestDto) {
-        String uuid = UUID.randomUUID().toString();
 
-        // 1. 프레임워크 검증 먼저 (폴더 생성 전에)
-        TemplateInitializer initializer = factory.getInitializer(requestDto.getFramework());
+        //  분기 검증
+        if ("FULL_STACK".equals(requestDto.getArchitecture_type())) {
 
-        // 2. 모델 결정
-        AiModel targetModel = resolveModel(user, requestDto.getModel());
-
-        // 3. DB 저장 (엔티티 생성자 내부에서 totalSize=0L, fileCount=0으로 안전하게 초기화됨)
-        Project project = projectRepository.save(Project.builder()
-                .name(requestDto.getProjectName())
-                .description("")
-                .uuid(uuid)
-                .framework(requestDto.getFramework())
-                .user(user)
-                .model(targetModel)
-                .build());
-
-        // TODO: [로그상태갱신] 프로젝트 데이터 저장 완료
-
-        // 4. 폴더 생성 + 템플릿 초기화
-        Path projectPath = Paths.get(baseStoragePath, String.valueOf(user.getId()), uuid);
-        try {
-            Files.createDirectories(projectPath);
-            initializer.initialize(projectPath, requestDto);
-        } catch (Exception e) {
-            deleteDirectory(projectPath);
-            throw new RuntimeException("프로젝트 폴더 생성 실패: " + uuid, e);
+            // 하나의 프레임워크에서 풀스택으로 구현하는 경우
+            if (hasValue(requestDto.getFullstack_framework()) && !hasValue(requestDto.getBackend_framework()) && !hasValue(requestDto.getFrontend_framework())) {
+                return setFrameworkForAddProjectAndFiles(user, requestDto, requestDto.getFullstack_framework());
+            }
+            // 백엔드와 프론트엔드의 프레임워크 가 분리되어 풀스택으로 구현하는 경우
+            else if (!hasValue(requestDto.getFullstack_framework()) && hasValue(requestDto.getBackend_framework()) && hasValue(requestDto.getFrontend_framework())){
+                // TODO: 풀스택 중 백엔드+프론트 복합인 경우는 아직 사용 불가
+            }
         }
+        else if ("CLIENT_SERVER".equals(requestDto.getArchitecture_type())) {
 
-        // TODO: [로그상태갱신] 프로젝트 생성 완료
+            // 백엔드 프론트엔드 중 백엔드만 구현하는 경우
+            if (hasValue(requestDto.getBackend_framework()) && !hasValue(requestDto.getFrontend_framework())) {
+                return setFrameworkForAddProjectAndFiles(user, requestDto, requestDto.getBackend_framework());
+            }
+            // 백엔드 프론트 엔드 중 프론트엔드만 구현하는 경우
+            else if (!hasValue(requestDto.getBackend_framework()) && hasValue(requestDto.getFrontend_framework())) {
+                return setFrameworkForAddProjectAndFiles(user, requestDto, requestDto.getFrontend_framework());
+            }
 
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-
-        // convertToDto를 버리고 디스크 스캔 없이 0L, 0개로 DTO 즉시 조립 및 반환
-        return ProjectResponseDto.builder()
-                .projectName(project.getName())
-                .description(project.getDescription())
-                .status(project.getStatus().toString())
-                .uuid(project.getUuid())
-                .framework(project.getFramework())
-                .model(project.getModel().getModelName())
-                .createdAt(project.getCreatedAt().format(formatter))
-                .lastModified(project.getLastModifiedAt().format(formatter))
-                .size(0L)       // 도메인 규칙에 따른 초기값 고정 (NFS I/O 제로)
-                .fileCount(0)   // 도메인 규칙에 따른 초기값 고정 (NFS I/O 제로)
-                .build();
+        }
+        return null; // 뭔가 올바르지 않은 값으로 전달되는 경우
     }
 
     /**
@@ -416,9 +398,9 @@ public class StorageService {
             }
 
             // 4. NFS 디스크에서 진짜 소스 코드 텍스트 긁어오기
-            return Files.readString(targetFilePath, java.nio.charset.StandardCharsets.UTF_8);
+            return Files.readString(targetFilePath, StandardCharsets.UTF_8);
 
-        } catch (java.nio.charset.MalformedInputException e) {
+        } catch (MalformedInputException e) {
             //[인프라 가드]: 만약 확장자 체크를 놓친 다른 이진 파일이 들어와도 서버가 터지지 않게 예외 격리
             log.warn("[StorageService] 인코딩 오류 - 텍스트 파일이 아닙니다. Path: {}", path);
             return "[Binary File] 인코딩할 수 없는 파일 포맷입니다.";
@@ -478,9 +460,9 @@ public class StorageService {
     private void deleteDirectoryRecursive(Path path) {
         if (Files.exists(path)) {
             try (var walk = Files.walk(path)) {
-                walk.sorted(java.util.Comparator.reverseOrder()) // 하위 파일부터 삭제
+                walk.sorted(Comparator.reverseOrder()) // 하위 파일부터 삭제
                         .map(Path::toFile)
-                        .forEach(java.io.File::delete);
+                        .forEach(File::delete);
             } catch (IOException e) {
                 throw new RuntimeException("물리적 폴더 삭제 실패: " + path, e);
             }
@@ -514,4 +496,63 @@ public class StorageService {
                 .orElseThrow(() -> new IllegalStateException("사용 가능한 AI 모델이 시스템에 존재하지 않습니다."));
     }
 
+    /**
+     * 문자열이 null이 아니고 비어있지 않은지(공백 제외) 체크하는 가벼운 유틸 메서드
+     */
+    private boolean hasValue(String str) {
+        return str != null && !str.trim().isEmpty();
+    }
+
+
+    /**
+    *  프로젝트 요구사항 기반 프로젝트 프레임워크 지정 분기 편의 메서드
+    */
+    private ProjectResponseDto setFrameworkForAddProjectAndFiles(User user, ProjectCreateRequestDto requestDto, String framework) {
+        String uuid = UUID.randomUUID().toString();
+
+        // 1. 프레임워크 검증 먼저 (폴더 생성 전에)
+        TemplateInitializer initializer = factory.getInitializer(framework);
+
+        // 2. 모델 결정
+        AiModel targetModel = resolveModel(user, requestDto.getModel());
+
+        // 3. DB 저장 (엔티티 생성자 내부에서 totalSize=0L, fileCount=0으로 안전하게 초기화됨)
+        Project project = projectRepository.save(Project.builder()
+                .name(requestDto.getProjectName())
+                .description("")
+                .uuid(uuid)
+                .framework(framework)
+                .user(user)
+                .model(targetModel)
+                .build());
+
+        // 4. 폴더 생성 + 템플릿 초기화
+        Path projectPath = Paths.get(baseStoragePath, String.valueOf(user.getId()), uuid);
+        try {
+            Files.createDirectories(projectPath);
+            initializer.initialize(projectPath, requestDto);
+        } catch (Exception e) {
+            deleteDirectory(projectPath);
+            throw new RuntimeException("프로젝트 폴더 생성 실패: " + uuid, e);
+        }
+
+        // TODO: [로그상태갱신] 프로젝트 생성 완료
+
+        // TODO: [로그상태갱신] 프로젝트 데이터 저장 완료
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+        return ProjectResponseDto.builder()
+                .projectName(project.getName())
+                .description(project.getDescription())
+                .status(project.getStatus().toString())
+                .uuid(project.getUuid())
+                .framework(project.getFramework())
+                .model(project.getModel().getModelName())
+                .createdAt(project.getCreatedAt().format(formatter))
+                .lastModified(project.getLastModifiedAt().format(formatter))
+                .size(0L)       // 도메인 규칙에 따른 초기값 고정 (NFS I/O 제로)
+                .fileCount(0)   // 도메인 규칙에 따른 초기값 고정 (NFS I/O 제로)
+                .build();
+    }
 }

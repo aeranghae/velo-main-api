@@ -47,6 +47,11 @@ public class ProjectApiController {
         // 2. 기본 폴더 및 프로젝트 엔티티 생성 (기존 기능 활용)
         // storageService에서 UUID 기반 폴더 생성 + 기본 프레임워크 파일 추가
         ProjectResponseDto newProject = storageService.createProject(user, requestDto);
+        // TODO: 구현안된 기능으로 요청했을 경우 프로세스 종료
+        if (newProject == null) {
+            return ResponseEntity.status(429)
+                    .build();
+        }
 
         try {
             // Step 2: [컨트롤러 단계] DB 커밋이 완료되었으므로 안전하게 빈 폴더 포함 파일 색인 진행
@@ -65,7 +70,7 @@ public class ProjectApiController {
 
         // 3. 생성된 폴더 내부에 상세 데이터 기반으로 자동화 공정 시작
         // 이 단계에서 FastAPI(LLM 서버)로 framework, language, prompt 등을 전송, 비동기라 다음 단계로 바로 넘어가게됨
-        if(user.getId() == 1){
+        if(user.getId() == 999){
             projectService.startAutomationProcess(user, newProject.getUuid(), requestDto);
         }
 

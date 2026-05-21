@@ -82,15 +82,17 @@ public class LlmAgentClient extends TextWebSocketHandler {
         // 로그 추가 샌드 박스 배정 완료 로그
         sendSystemLog("INFO", "[System] 격리 구역 배정 완료. 자율 코딩 루프를 개시합니다.", "GENERATING");
 
-        List<ProjectNodeResponse> fileNodes = storageService.getProjectTree(email, uuid);
-        Map<String, Object> initialPrompt = new HashMap<>();
-        initialPrompt.put("type", "INIT");
-        initialPrompt.put("projectName", requestDto.getProjectName());
-        initialPrompt.put("framework", requestDto.getFramework());
-        initialPrompt.put("language", requestDto.getLanguage());
-        initialPrompt.put("license", requestDto.getLicense());
-        initialPrompt.put("prompt", requestDto.getPrompt());
-        initialPrompt.put("tree", fileNodes);
+        Map<String, Object> initialPrompt = initialPromptBuilder();
+        if(initialPrompt == null) {
+            // 완료했다면 COMPLETED
+            this.finalProjectStatus = "FAILED";
+
+            // TODO: 프로젝트 테이블 상태 관리 객체를 호출해 프로젝트 상태를 'FAILED'로 변경하는 비즈니스 로직을 여기에 연동
+
+            // 소켓을 정상 종료 상태로 완전히 닫아버립니다. (자동으로 afterConnectionClosed가 실행됨)
+            session.close(CloseStatus.NORMAL);
+            return;
+        }
 
         session.sendMessage(new TextMessage(objectMapper.writeValueAsString(initialPrompt)));
 
@@ -128,9 +130,7 @@ public class LlmAgentClient extends TextWebSocketHandler {
 
         AiModelMessage.Action action = objectMapper.readValue(payload, AiModelMessage.Action.class);
         AiModelMessage.Observation observation;
-        
-        
-        
+
         // 2. 도구(Tool) 매핑 분기문
         if ("WRITE_FILE".equals(action.getTool())) {
             // [메인 로그추가] 파싱 완료된 정당한 시점 로그 생성 시작
@@ -247,5 +247,60 @@ public class LlmAgentClient extends TextWebSocketHandler {
         }
         // 컨테이너 파괴 로그와 동시에 최종 상태를 얹어 일괄 덤프
         sendSystemLog("INFO", "안전 무결 격리 공간 반환 완료. 세션 마감.", this.finalProjectStatus);
+    }
+
+    private Map<String, Object> initialPromptBuilder(){
+        String framework = "";
+        String language = "";
+
+        if ("FULL_STACK".equals(requestDto.getArchitecture_type())) {
+
+            // 하나의 프레임워크에서 풀스택으로 구현하는 경우
+            if (hasValue(requestDto.getFullstack_framework()) && !hasValue(requestDto.getBackend_framework()) && !hasValue(requestDto.getFrontend_framework())) {
+                framework =  requestDto.getFullstack_framework();
+                language =  requestDto.getFullstack_language();
+            }
+            // 백엔드와 프론트엔드의 프레임워크 가 분리되어 풀스택으로 구현하는 경우
+            else if (!hasValue(requestDto.getFullstack_framework()) && hasValue(requestDto.getBackend_framework()) && hasValue(requestDto.getFrontend_framework())){
+                // TODO: 풀스택 중 백엔드+프론트 복합인 경우는 아직 사용 불가
+                return null;
+            }
+        }
+        else if ("CLIENT_SERVER".equals(requestDto.getArchitecture_type())) {
+
+            // 백엔드 프론트엔드 중 백엔드만 구현하는 경우
+            if (hasValue(requestDto.getBackend_framework()) && !hasValue(requestDto.getFrontend_framework())) {
+                framework =  requestDto.getBackend_framework();
+                language =  requestDto.getBackend_language();
+            }
+            // 백엔드 프론트 엔드 중 프론트엔드만 구현하는 경우
+            else if (!hasValue(requestDto.getBackend_framework()) && hasValue(requestDto.getFrontend_framework())) {
+                framework =  requestDto.getFrontend_framework();
+                language =  requestDto.getFrontend_language();
+            }
+
+        }
+
+        List<ProjectNodeResponse> fileNodes = storageService.getProjectTree(email, uuid);
+
+        Map<String, Object> initialPrompt = new HashMap<>();
+        initialPrompt.put("type", "INIT");
+        initialPrompt.put("projectName", requestDto.getProjectName());
+        initialPrompt.put("architecture_type", requestDto.getArchitecture_type());
+        initialPrompt.put("framework", framework);
+        initialPrompt.put("language", language);
+        initialPrompt.put("database", requestDto.getDatabase());
+        initialPrompt.put("license", requestDto.getLicense());
+        initialPrompt.put("prompt", requestDto.getPrompt());
+        initialPrompt.put("tree", fileNodes);
+
+        return initialPrompt;
+    }
+
+    /**
+     * 문자열이 null이 아니고 비어있지 않은지(공백 제외) 체크하는 가벼운 유틸 메서드
+     */
+    private boolean hasValue(String str) {
+        return str != null && !str.trim().isEmpty();
     }
 }
