@@ -76,7 +76,7 @@ public class AiModelService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
-        if(user.getId() != 1){
+        if(user.getId() != 1 && user.getId() != 2){
             return null;
         }
 
