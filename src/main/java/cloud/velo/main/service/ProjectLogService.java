@@ -112,6 +112,8 @@ public class ProjectLogService {
         String logLine = dto.getLogLevel() + "||" + createdAtStr + "||" + incomingStatus.name() + "||" + dto.getMessage();
         redisTemplate.opsForList().rightPush(redisKey, logLine);
 
+        // 만료 시간을 24시간으로 설정
+        redisTemplate.expire(redisKey, java.time.Duration.ofDays(1));
 
         SseEmitter emitter = emitters.get(uuid);
 
@@ -132,37 +134,42 @@ public class ProjectLogService {
 
             if (rawLogs != null && !rawLogs.isEmpty()) {
 
-                Project project = projectRepository.findByUuid(uuid).orElseThrow();
-                User owner = project.getUser();
+                try {
+                    Project project = projectRepository.findByUuid(uuid).orElseThrow();
+                    User owner = project.getUser();
 
-                List<ProjectLog> bulkLogEntities = new ArrayList<>();
-                for (String raw : rawLogs) {
-                    String[] parts = raw.split("\\|\\|", 4);
+                    List<ProjectLog> bulkLogEntities = new ArrayList<>();
+                    for (String raw : rawLogs) {
+                        String[] parts = raw.split("\\|\\|", 4);
 
-                    LocalDateTime createdAt = LocalDateTime.parse(parts[1],ISO_FORMATTER);
+                        LocalDateTime createdAt = LocalDateTime.parse(parts[1],ISO_FORMATTER);
+                        ProjectStatus rowStatus = ProjectStatus.valueOf(parts[2]);
 
-                    ProjectStatus rowStatus = ProjectStatus.valueOf(parts[2]);
-
-                    bulkLogEntities.add(ProjectLog.builder()
-                            .user(owner)
-                            .project(project)
-                            .logLevel(parts[0])
-                            .status(rowStatus)
-                            .createdAt(createdAt)
-                            .message(parts[3])
-                            .build());
-                }
-
+                        bulkLogEntities.add(ProjectLog.builder()
+                                .user(owner)
+                                .project(project)
+                                .logLevel(parts[0])
+                                .status(rowStatus)
+                                .createdAt(createdAt)
+                                .message(parts[3])
+                                .build());
+                    }
                 projectLogRepository.saveAll(bulkLogEntities);
                 project.updateStatus(incomingStatus); // 프로젝트 최종상태 업데이트
+                    log.info("[DB] 최종 로그 일괄 덤프 완료. 루프를 성공적으로 마감합니다.");
+            } catch (Exception e) {
+                log.error("[🚨DB Error] 최종 로그를 DB에 백업하는 과정에서 실패했습니다.", e);
+            } finally {
+                // 예외 발생 여부와 무관하게 실행
+                clearRedisLogCache(uuid);
             }
+        }
 
             //  공정 종결 시 종결된 복합 키를 타겟으로 에미터 종료 및 장부 삭제 진행
             if (emitter != null) {
                 emitter.complete();
             }
             emitters.remove(uuid);
-            redisTemplate.delete(redisKey);
         }
     }
 
@@ -194,7 +201,24 @@ public class ProjectLogService {
     @Transactional
     public void deleteLogsByProjectId(Long projectId) {
         log.info("[System] 프로젝트(ID: {}) 삭제 요청 감지. 연관된 모든 자식 로그 데이터를 먼저 제거합니다.", projectId);
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 프로젝트입니다. ID: " + projectId));
+
+        clearRedisLogCache(project.getUuid());
+       // 3. 기존 DB 데이터 삭제 진행
         projectLogRepository.deleteByProjectId(projectId);
+    }
+
+    private void clearRedisLogCache(String uuid) {
+        String redisKey = "project:logs:" + uuid;
+        Boolean isDeleted = redisTemplate.delete(redisKey);
+
+        if (Boolean.TRUE.equals(isDeleted)) {
+            log.info("[Redis] 임시 로그 캐시가 성공적으로 비워졌습니다. Key: {}", redisKey);
+        } else {
+            log.debug("[Redis] 삭제하려는 키가 존재하지 않거나 이미 만료되었습니다. Key: {}", redisKey);
+        }
     }
 
 }
