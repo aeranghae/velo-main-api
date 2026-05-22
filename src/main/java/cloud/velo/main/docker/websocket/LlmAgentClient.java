@@ -32,8 +32,8 @@ public class LlmAgentClient extends TextWebSocketHandler {
     private final String baseImage;
     private final ProjectCreateRequestDto requestDto;
 
-    // 무한 루프 폭주 방지를 위한 안전 장치 (최대 50턴 제한)
-    private static final int MAX_TURN_LIMIT = 50;
+    // 무한 루프 폭주 방지를 위한 안전 장치 (최대 100턴 제한)
+    private static final int MAX_TURN_LIMIT = 150;
     private int executionTurnCount = 0;
 
     // 이 세션(웹소켓 파이프라인) 동안 점진적 작업을 수행할 도커 컨테이너 고유 ID
