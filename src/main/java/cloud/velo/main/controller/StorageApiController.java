@@ -4,14 +4,17 @@ import cloud.velo.main.controller.dto.FrameworkStatisticsResponse;
 import cloud.velo.main.controller.dto.ProjectCreateRequestDto;
 import cloud.velo.main.controller.dto.ProjectNodeResponse;
 import cloud.velo.main.controller.dto.ProjectResponseDto;
+import cloud.velo.main.domain.Project;
 import cloud.velo.main.domain.User;
+import cloud.velo.main.repository.ProjectRepository;
 import cloud.velo.main.repository.UserRepository;
 import cloud.velo.main.service.StorageService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +26,7 @@ public class StorageApiController {
 
     private final StorageService storageService;
     private final UserRepository userRepository;
+    private final ProjectRepository projectRepository;
 
     // 생성 - - - - - - - - - - - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // 2. 새 프로젝트 생성 (UUID 기반)
@@ -168,5 +172,37 @@ public class StorageApiController {
         User user = userRepository.findByEmail(email).orElseThrow();
         storageService.deleteProject(user, uuid);
         return ResponseEntity.noContent().build();
+    }
+
+    // 프로젝트 다운
+    @GetMapping("/{uuid}/download")
+    public ResponseEntity<byte[]> downloadProject(
+            @AuthenticationPrincipal String email,
+            @PathVariable String uuid
+    ) {
+        User user = userRepository.findByEmail(email).orElseThrow();
+        Project project = projectRepository.findByUuid(uuid)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 프로젝트입니다. UUID: " + uuid));
+
+        // 1. 서비스 레이어를 호출하여 압축된 파일의 바이너리 데이터(byte[])를 가져옴
+        byte[] zipData = storageService.downloadProject(user, uuid);
+
+        // 2. HTTP 응답 헤더 설정
+        HttpHeaders headers = new HttpHeaders();
+
+        // 응답 타입을 zip 파일로 명시
+        headers.setContentType(MediaType.parseMediaType("application/zip"));
+
+        // 모든 종류의 공백(\\s)을 찾아 빈 문자열("")로 대체합니다.
+        String zipName = project.getName().replaceAll("\\s+", "") + ".zip";
+
+        // uuid + ".zip" 대신 새로 만든 zipName을 넣어줍니다.
+        ContentDisposition contentDisposition = ContentDisposition.attachment()
+                .filename(zipName, StandardCharsets.UTF_8)
+                .build();
+        headers.setContentDisposition(contentDisposition);
+
+        // 3. 데이터, 헤더, HTTP 상태 코드를 ResponseEntity에 담아서 반환
+        return new ResponseEntity<>(zipData, headers, HttpStatus.OK);
     }
 }
