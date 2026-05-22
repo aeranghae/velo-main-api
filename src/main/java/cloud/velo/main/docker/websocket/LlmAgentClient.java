@@ -72,6 +72,9 @@ public class LlmAgentClient extends TextWebSocketHandler {
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
 
+        session.setTextMessageSizeLimit(50 * 1024 * 1024);   // 30 MegaBytes
+        session.setBinaryMessageSizeLimit(50 * 1024 * 1024); // 30 MegaBytes
+
         log.info("[소켓-{}] FastAPI 연결 수립 완료. 샌드박스 컨테이너를 선제 가동합니다. 이미지: {}", uuid, baseImage);
 
         // 샌드 박스 가동 알림 로그 추가
