@@ -16,6 +16,4 @@ public interface ProjectLogRepository extends JpaRepository<ProjectLog, Long> {
      */
     @Query("SELECT pl FROM ProjectLog pl WHERE pl.user.id = :userId AND pl.project.id = :projectId ORDER BY pl.id ASC")
     List<ProjectLog> findLogsByUserIdAndProjectId(@Param("userId") Long userId, @Param("projectId") Long projectId);
-
-    void deleteByProjectId(Long projectId);
 }
