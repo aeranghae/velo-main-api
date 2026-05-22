@@ -29,17 +29,17 @@ public class VueTemplateInitializer extends BaseTemplateInitializer {
                 "public"
         ));
 
-        writeFile(rootPath.resolve("src/main.ts"), mainTs());
-        writeFile(rootPath.resolve("src/App.vue"), appVue());
-        writeFile(rootPath.resolve("src/router/index.ts"), routerIndex());
-        writeFile(rootPath.resolve("src/stores/counter.ts"), sampleStore());
-        writeFile(rootPath.resolve("src/api/index.ts"), apiIndex());
-        writeFile(rootPath.resolve("package.json"), packageJson(projectName));
-        writeFile(rootPath.resolve("vite.config.ts"), viteConfig());
-        writeFile(rootPath.resolve("tsconfig.json"), tsconfig());
-        writeFile(rootPath.resolve(".env.example"), envExample());
-        writeFile(rootPath.resolve(".gitignore"), vueGitignore());
-        writeFile(rootPath.resolve("README.md"), readme(projectName, dto.getLicense()));
+        //writeFile(rootPath.resolve("src/main.ts"), mainTs());
+        //writeFile(rootPath.resolve("src/App.vue"), appVue());
+        //writeFile(rootPath.resolve("src/router/index.ts"), routerIndex());
+        //writeFile(rootPath.resolve("src/stores/counter.ts"), sampleStore());
+        //writeFile(rootPath.resolve("src/api/index.ts"), apiIndex());
+        //writeFile(rootPath.resolve("package.json"), packageJson(projectName));
+        //writeFile(rootPath.resolve("vite.config.ts"), viteConfig());
+        //writeFile(rootPath.resolve("tsconfig.json"), tsconfig());
+        //writeFile(rootPath.resolve(".env.example"), envExample());
+        //writeFile(rootPath.resolve(".gitignore"), vueGitignore());
+        //writeFile(rootPath.resolve("README.md"), readme(projectName, dto.getLicense()));
     }
 
     private String mainTs() {

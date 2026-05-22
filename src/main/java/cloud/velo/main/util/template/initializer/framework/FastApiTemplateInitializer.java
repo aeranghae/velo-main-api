@@ -27,20 +27,20 @@ public class FastApiTemplateInitializer extends BaseTemplateInitializer {
                 "tests"
         ));
 
-        writeFile(rootPath.resolve("app/main.py"), mainPy(projectName));
-        writeFile(rootPath.resolve("app/core/config.py"), configPy(projectName));
-        writeFile(rootPath.resolve("app/api/v1/router.py"), routerPy());
-        writeFile(rootPath.resolve("app/__init__.py"), "");
-        writeFile(rootPath.resolve("app/api/__init__.py"), "");
-        writeFile(rootPath.resolve("app/api/v1/__init__.py"), "");
-        writeFile(rootPath.resolve("app/api/v1/endpoints/__init__.py"), "");
-        writeFile(rootPath.resolve("app/models/__init__.py"), "");
-        writeFile(rootPath.resolve("app/schemas/__init__.py"), "");
-        writeFile(rootPath.resolve("app/services/__init__.py"), "");
+        //writeFile(rootPath.resolve("app/main.py"), mainPy(projectName));
+        //writeFile(rootPath.resolve("app/core/config.py"), configPy(projectName));
+        //writeFile(rootPath.resolve("app/api/v1/router.py"), routerPy());
+        //writeFile(rootPath.resolve("app/__init__.py"), "");
+        //writeFile(rootPath.resolve("app/api/__init__.py"), "");
+        //writeFile(rootPath.resolve("app/api/v1/__init__.py"), "");
+        //writeFile(rootPath.resolve("app/api/v1/endpoints/__init__.py"), "");
+        //writeFile(rootPath.resolve("app/models/__init__.py"), "");
+        //writeFile(rootPath.resolve("app/schemas/__init__.py"), "");
+        //writeFile(rootPath.resolve("app/services/__init__.py"), "");
         writeFile(rootPath.resolve("requirements.txt"), requirements());
-        writeFile(rootPath.resolve(".env.example"), envExample(projectName));
-        writeFile(rootPath.resolve(".gitignore"), fastApiGitignore());
-        writeFile(rootPath.resolve("README.md"), readme(projectName, dto.getLicense()));
+        //writeFile(rootPath.resolve(".env.example"), envExample(projectName));
+        //writeFile(rootPath.resolve(".gitignore"), fastApiGitignore());
+        //writeFile(rootPath.resolve("README.md"), readme(projectName, dto.getLicense()));
     }
 
     private String mainPy(String projectName) {
