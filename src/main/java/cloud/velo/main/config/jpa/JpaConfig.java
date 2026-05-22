@@ -2,9 +2,11 @@ package cloud.velo.main.config.jpa;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.data.redis.repository.configuration.EnableRedisRepositories;
 
 @Configuration
 @EnableJpaRepositories(basePackages = "cloud.velo.main.repository")
+@EnableRedisRepositories(basePackages = "cloud.velo.main.repository.redis")
 public class JpaConfig {
     // 나중에 @EnableJpaAuditing 등을 여기에 추가해서 관리
 
