@@ -4,6 +4,7 @@ import cloud.velo.main.controller.dto.ProjectLogResponseDto;
 import cloud.velo.main.domain.Project;
 import cloud.velo.main.service.ProjectLogService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -29,20 +30,22 @@ public class ProjectLogController {
     @GetMapping("/{uuid}/status")
     public ResponseEntity<ProjectLogResponseDto> getProjectLogs(
             @PathVariable("uuid") String uuid,
-            @AuthenticationPrincipal UserDetails userDetails) {
+            @AuthenticationPrincipal String email) {
 
-        ProjectLogResponseDto response = projectLogService.getProjectMetadataAndLogs(uuid, userDetails.getUsername());
+        ProjectLogResponseDto response = projectLogService.getProjectMetadataAndLogs(uuid, email);
         return ResponseEntity.ok(response);
     }
     @GetMapping(value = "/{uuid}/logs/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamProjectLogs(
+    public ResponseEntity<SseEmitter> streamProjectLogs(
             @PathVariable("uuid") String uuid,
-            @AuthenticationPrincipal UserDetails userDetails) {
-        // 1. Spring Security 컨텍스트에서 안전하게 이메일 추출
-        String email = userDetails.getUsername();
-
+            @AuthenticationPrincipal String email) {
+        // 🛡️ [안전 가드] 무인증 유저의 좀비 무한 루프 접속 차단
+        if (email == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         // 3. 추출한 이메일로 SSE 연결 생성
-        return projectLogService.createSseConnection(uuid, email);
+        SseEmitter emitter = projectLogService.createSseConnection(uuid, email);
+        return ResponseEntity.ok(emitter);
     }
 
     @DeleteMapping("/{uuid}")
