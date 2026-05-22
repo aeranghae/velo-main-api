@@ -52,14 +52,14 @@ public class ProjectLogController {
     @Transactional // 🌟 데이터 파괴 공정이므로 트랜잭션 필수 걸어주기
     public ResponseEntity<Void> deleteProjectAndLogs(
             @PathVariable("uuid") String uuid,
-            @AuthenticationPrincipal UserDetails userDetails) {
+            @AuthenticationPrincipal String email) {
 
         // 1. 안전 가드: UUID에 해당하는 프로젝트가 진짜 있는지 확인
         Project project = projectRepository.findByUuid(uuid)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 프로젝트입니다. UUID: " + uuid));
 
         // 2. 소유권 검증: 로그인한 유저가 이 프로젝트의 주인이 맞는지 체크
-        if (!project.getUser().getEmail().equals(userDetails.getUsername())) {
+        if (!project.getUser().getEmail().equals(email)) {
             throw new SecurityException("해당 프로젝트를 삭제할 정식 권한이 없습니다.");
         }
 
