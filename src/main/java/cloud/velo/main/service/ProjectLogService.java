@@ -187,7 +187,7 @@ public class ProjectLogService {
         }
 
         // 복잡한 키 대신 직관적이고 빠른 uuid를 전화선 번호로 씁니다.
-        SseEmitter emitter = new SseEmitter(60 * 1000L);
+        SseEmitter emitter = new SseEmitter(-1L);
         emitters.put(uuid, emitter);
 
         emitter.onCompletion(() -> emitters.remove(uuid));
