@@ -9,6 +9,7 @@ import cloud.velo.main.domain.Project;
 import cloud.velo.main.domain.ProjectNode;
 import cloud.velo.main.domain.User;
 import cloud.velo.main.repository.AiModelRepository;
+import cloud.velo.main.repository.ProjectLogRepository;
 import cloud.velo.main.repository.ProjectRepository;
 import cloud.velo.main.repository.UserRepository;
 import cloud.velo.main.util.template.TemplateInitializer;
@@ -46,6 +47,7 @@ import java.util.stream.Stream;
 public class StorageService {
 
     private final ProjectRepository projectRepository;
+    private final ProjectLogRepository projectLogRepository;
     private final AiModelRepository aiModelRepository;
     private final UserRepository userRepository;
     private final TemplateInitializerFactory factory;
@@ -192,6 +194,8 @@ public class StorageService {
         Project project = projectRepository.findByUuid(uuid)
                 .filter(p -> p.getUser().getId().equals(user.getId()))
                 .orElseThrow(() -> new IllegalArgumentException("프로젝트를 찾을 수 없거나 권한이 없습니다."));
+
+        projectLogRepository.deleteByProjectId(project.getId());
 
         // DB 삭제
         projectRepository.delete(project);
