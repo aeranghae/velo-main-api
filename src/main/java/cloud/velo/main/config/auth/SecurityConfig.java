@@ -1,5 +1,6 @@
 package cloud.velo.main.config.auth;
 
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -38,6 +39,13 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+                // 🌟 [추가] 인증 실패 시 예외 처리 핸들러 장착
+                // 토큰이 없는 익명 사용자가 인증 필요한 API에 접근하면 컨트롤러 진입을 '원천 차단'하고 401을 반환합니다.
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "인증 자격 증명이 유효하지 않거나 누락되었습니다.");
+                        })
                 )
                 .authorizeHttpRequests(auth -> {
                     auth.requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll();
