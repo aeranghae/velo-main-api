@@ -48,6 +48,7 @@ public class StorageService {
     private final ProjectRepository projectRepository;
     private final AiModelRepository aiModelRepository;
     private final UserRepository userRepository;
+    private final ProjectLogService projectLogService;
     private final TemplateInitializerFactory factory;
     private final CacheManager cacheManager;
 
@@ -192,6 +193,8 @@ public class StorageService {
         Project project = projectRepository.findByUuid(uuid)
                 .filter(p -> p.getUser().getId().equals(user.getId()))
                 .orElseThrow(() -> new IllegalArgumentException("프로젝트를 찾을 수 없거나 권한이 없습니다."));
+
+        projectLogService.deleteLogsByProjectId(project.getId());
 
         // DB 삭제
         projectRepository.delete(project);
