@@ -41,12 +41,14 @@ public class AgentConnectionManager {
      */
     public void startProjectGeneration(String userId, String uuid, String email, String baseImage, ProjectCreateRequestDto requestDto) {
         // 1. 디렉토리 검증 및 세팅 (userdir/userid/uuid 구조 충실 반영)
-        String hostPath = baseStoragePath + userId + "/" + uuid;
-        File directory = new File(hostPath);
-        if (!directory.exists()) {
-            directory.mkdirs();
+        File userDir = new File(baseStoragePath, userId);
+        File baseDirFile = new File(userDir, uuid);
+
+        if (!baseDirFile.exists()) {
+            baseDirFile.mkdirs();
         }
-        log.info("[Manager] 프로젝트 초기 저장소 확인 완료. 경로: {}", hostPath);
+
+        log.info("[Manager] 프로젝트 초기 저장소 확인 완료. 경로: {}", baseDirFile.getAbsolutePath());
 
         // 2. 이 세션(UUID)만을 전용으로 담당할 독립된 웹소켓 핸들러 객체 생성
         LlmAgentClient dynamicHandler = new LlmAgentClient(
