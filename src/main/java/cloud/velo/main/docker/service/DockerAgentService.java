@@ -183,7 +183,46 @@ public class DockerAgentService {
     }
 
     /**
-     * [기능 4] 공정 시작 시 컨테이너를 켜두는 메서드 (최초 1회만 호출)
+     * [기능 4] 지정된 NFS 격리 구역 내의 특정 파일 내용을 안전하게 읽어오는 메서드 (RAG 최적화 전용)
+     */
+    public String readFile(String userId, String uuid, String relativePath) throws IOException {
+        // 1. 자바 내장 File 생성자를 활용하여 격리구역 루트 경로 정의
+        // 결과 경로: {baseStoragePath}/{userId}/{uuid}
+        File baseDirFile = new File(new File(baseStoragePath, userId), uuid);
+        Path basePath = baseDirFile.toPath().toAbsolutePath().normalize();
+
+        // 2. 읽기 요청된 파일의 절대 경로 계산 및 정형화
+        Path targetPath = basePath.resolve(relativePath).toAbsolutePath().normalize();
+
+        log.info("[Security-Check] 파일 읽기 대상 경로 검증 - Base: {}, Target: {}", basePath, targetPath);
+
+        // 3. 🛡️ [보안 관문] 디렉토리 트래버설(샌드박스 탈출) 우회 공격 검증 가드
+        if (!targetPath.startsWith(basePath)) {
+            log.error("[Security-Check] 위반 감지! 샌드박스 바깥 영역에 대한 읽기 접근이 차단되었습니다. 공격 경로: {}", relativePath);
+            throw new SecurityException("허용되지 않은 파일 접근입니다. 격리 구역 외의 파일은 읽을 수 없습니다.");
+        }
+
+        // 4. 검증을 통과한 안전한 파일 객체 변환
+        File file = targetPath.toFile();
+
+        // 5. 파일 존재 여부 및 유효성 체크
+        if (!file.exists()) {
+            throw new java.io.FileNotFoundException("요청한 파일이 격리 구역 내에 존재하지 않습니다: " + relativePath);
+        }
+        if (!file.isFile()) {
+            throw new IllegalArgumentException("요청한 경로가 올바른 파일 형식이 아닙니다(디렉토리 등): " + relativePath);
+        }
+
+        // 6. 파일 본문 전체를 안전하게 String으로 변환하여 반환 (Java 11+ 내장 표준 규격 사용)
+        // Try-with-resources 구조 없이도 내부적으로 스트림 열고 닫기가 완벽히 보장됩니다.
+        String content = java.nio.file.Files.readString(targetPath, java.nio.charset.StandardCharsets.UTF_8);
+
+        log.info("[DockerAgentService] 격리 구역 내 파일 조회 및 텍스트 스트리밍 완료: {}", file.getAbsolutePath());
+        return content;
+    }
+
+    /**
+     * [기능 5] 공정 시작 시 컨테이너를 켜두는 메서드 (최초 1회만 호출)
      * @return 생성된 도커 컨테이너 고유 ID
      */
     public String startSandbox(String userId, String uuid, String baseImage) {
@@ -222,7 +261,7 @@ public class DockerAgentService {
 
 
     /**
-     * [기능 5] 공정이 완전히 끝났을 때 샌드박스 파괴 (최종 1회 호출)
+     * [기능 6] 공정이 완전히 끝났을 때 샌드박스 파괴 (최종 1회 호출)
      */
     public void stopSandbox(String containerId) {
         try {
