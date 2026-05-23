@@ -193,10 +193,12 @@ public class StorageApiController {
         // 응답 타입을 zip 파일로 명시
         headers.setContentType(MediaType.parseMediaType("application/zip"));
 
+        // 클라이언트가 진행률을 계산할 수 있도록 전체 파일 크기(바이트 수)를 지정합니다.
+        headers.setContentLength(zipData.length);
+
         // 모든 종류의 공백(\\s)을 찾아 빈 문자열("")로 대체합니다.
         String zipName = project.getName().replaceAll("\\s+", "") + ".zip";
 
-        // uuid + ".zip" 대신 새로 만든 zipName을 넣어줍니다.
         ContentDisposition contentDisposition = ContentDisposition.attachment()
                 .filename(zipName, StandardCharsets.UTF_8)
                 .build();
