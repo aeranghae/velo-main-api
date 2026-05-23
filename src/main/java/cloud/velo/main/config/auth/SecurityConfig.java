@@ -2,6 +2,7 @@ package cloud.velo.main.config.auth;
 
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import jakarta.servlet.DispatcherType;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -48,6 +49,11 @@ public class SecurityConfig {
                         })
                 )
                 .authorizeHttpRequests(auth -> {
+                    auth.dispatcherTypeMatchers(
+                            jakarta.servlet.DispatcherType.ASYNC,
+                            jakarta.servlet.DispatcherType.ERROR
+                    ).permitAll();
+
                     auth.requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll();
                     auth.requestMatchers("/api/auth/google").permitAll();
 
