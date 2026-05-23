@@ -26,15 +26,15 @@ public class NestJsTemplateInitializer extends BaseTemplateInitializer {
                 "test"
         ));
 
-        writeFile(rootPath.resolve("src/main.ts"), mainTs(projectName));
-        writeFile(rootPath.resolve("src/app.module.ts"), appModuleTs());
-        writeFile(rootPath.resolve("src/app.controller.ts"), appControllerTs());
-        writeFile(rootPath.resolve("src/app.service.ts"), appServiceTs());
-        writeFile(rootPath.resolve("package.json"), packageJson(projectName));
-        writeFile(rootPath.resolve("tsconfig.json"), tsconfig());
-        writeFile(rootPath.resolve(".env.example"), envExample(projectName));
-        writeFile(rootPath.resolve(".gitignore"), nestGitignore());
-        writeFile(rootPath.resolve("README.md"), readme(projectName, dto.getLicense()));
+        //writeFile(rootPath.resolve("src/main.ts"), mainTs(projectName));
+        //writeFile(rootPath.resolve("src/app.module.ts"), appModuleTs());
+        //writeFile(rootPath.resolve("src/app.controller.ts"), appControllerTs());
+        //writeFile(rootPath.resolve("src/app.service.ts"), appServiceTs());
+        //writeFile(rootPath.resolve("package.json"), packageJson(projectName));
+        //writeFile(rootPath.resolve("tsconfig.json"), tsconfig());
+        //writeFile(rootPath.resolve(".env.example"), envExample(projectName));
+        //writeFile(rootPath.resolve(".gitignore"), nestGitignore());
+        //writeFile(rootPath.resolve("README.md"), readme(projectName, dto.getLicense()));
     }
 
     private String mainTs(String projectName) {

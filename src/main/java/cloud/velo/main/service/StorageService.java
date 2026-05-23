@@ -25,8 +25,10 @@ import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -39,6 +41,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @Slf4j
 @Service
@@ -48,6 +52,7 @@ public class StorageService {
     private final ProjectRepository projectRepository;
     private final AiModelRepository aiModelRepository;
     private final UserRepository userRepository;
+    private final ProjectLogService projectLogService;
     private final TemplateInitializerFactory factory;
     private final CacheManager cacheManager;
 
@@ -193,12 +198,53 @@ public class StorageService {
                 .filter(p -> p.getUser().getId().equals(user.getId()))
                 .orElseThrow(() -> new IllegalArgumentException("프로젝트를 찾을 수 없거나 권한이 없습니다."));
 
+        projectLogService.deleteLogsByProjectId(project.getId());
+
         // DB 삭제
         projectRepository.delete(project);
 
         // 물리 폴더 삭제
         Path projectPath = Paths.get(baseStoragePath, String.valueOf(user.getId()), uuid);
         deleteDirectoryRecursive(projectPath);
+    }
+
+    public byte[] downloadProject(User user, String uuid) {
+        Project project = projectRepository.findByUuid(uuid)
+                .filter(p -> p.getUser().getId().equals(user.getId()))
+                .orElseThrow(() -> new IllegalArgumentException("프로젝트를 찾을 수 없거나 권한이 없습니다."));
+
+        Path sourceDirPath = Paths.get(baseStoragePath, String.valueOf(user.getId()), uuid);
+
+        if (!Files.exists(sourceDirPath) || !Files.isDirectory(sourceDirPath)) {
+            throw new IllegalArgumentException("저장된 프로젝트 디렉토리가 존재하지 않습니다.");
+        }
+
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+             ZipOutputStream zos = new ZipOutputStream(baos);
+             // 💡 여기에 walk 스트림을 선언하여 try가 끝날 때 자동으로 close() 되게 만듭니다.
+             Stream<Path> walk = Files.walk(sourceDirPath)) {
+
+            walk.filter(path -> !Files.isDirectory(path))
+                    .forEach(path -> {
+                        String zipEntryName = sourceDirPath.relativize(path).toString().replace("\\", "/");
+
+                        try {
+                            ZipEntry zipEntry = new ZipEntry(zipEntryName);
+                            zos.putNextEntry(zipEntry);
+
+                            Files.copy(path, zos);
+                            zos.closeEntry();
+                        } catch (IOException e) {
+                            throw new UncheckedIOException("파일 압축 중 오류 발생: " + path, e);
+                        }
+                    });
+
+            zos.finish();
+            return baos.toByteArray();
+
+        } catch (UncheckedIOException | IOException e) {
+            throw new RuntimeException("프로젝트 압축 다운로드 중 오류가 발생했습니다.", e);
+        }
     }
 
     // 조회 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

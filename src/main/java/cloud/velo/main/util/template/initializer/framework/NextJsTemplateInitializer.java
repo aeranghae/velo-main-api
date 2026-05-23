@@ -27,17 +27,17 @@ public class NextJsTemplateInitializer extends BaseTemplateInitializer {
                 "public"
         ));
 
-        writeFile(rootPath.resolve("src/app/layout.tsx"), layoutTsx(projectName));
-        writeFile(rootPath.resolve("src/app/page.tsx"), pageTsx());
-        writeFile(rootPath.resolve("src/app/globals.css"), globalsCss());
-        writeFile(rootPath.resolve("src/lib/utils.ts"), utilsTs());
-        writeFile(rootPath.resolve("src/api/index.ts"), apiIndex());
-        writeFile(rootPath.resolve("package.json"), packageJson(projectName));
-        writeFile(rootPath.resolve("next.config.ts"), nextConfig());
-        writeFile(rootPath.resolve("tsconfig.json"), tsconfig());
-        writeFile(rootPath.resolve(".env.example"), envExample());
-        writeFile(rootPath.resolve(".gitignore"), nextGitignore());
-        writeFile(rootPath.resolve("README.md"), readme(projectName, dto.getLicense()));
+        //writeFile(rootPath.resolve("src/app/layout.tsx"), layoutTsx(projectName));
+        //writeFile(rootPath.resolve("src/app/page.tsx"), pageTsx());
+        //writeFile(rootPath.resolve("src/app/globals.css"), globalsCss());
+        //writeFile(rootPath.resolve("src/lib/utils.ts"), utilsTs());
+        //writeFile(rootPath.resolve("src/api/index.ts"), apiIndex());
+        //writeFile(rootPath.resolve("package.json"), packageJson(projectName));
+        //writeFile(rootPath.resolve("next.config.ts"), nextConfig());
+        //writeFile(rootPath.resolve("tsconfig.json"), tsconfig());
+        //writeFile(rootPath.resolve(".env.example"), envExample());
+        //writeFile(rootPath.resolve(".gitignore"), nextGitignore());
+        //writeFile(rootPath.resolve("README.md"), readme(projectName, dto.getLicense()));
     }
 
     private String layoutTsx(String projectName) {

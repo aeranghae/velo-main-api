@@ -1,6 +1,8 @@
 package cloud.velo.main.config.auth;
 
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import jakarta.servlet.DispatcherType;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -39,7 +41,19 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
+                // 🌟 [추가] 인증 실패 시 예외 처리 핸들러 장착
+                // 토큰이 없는 익명 사용자가 인증 필요한 API에 접근하면 컨트롤러 진입을 '원천 차단'하고 401을 반환합니다.
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "인증 자격 증명이 유효하지 않거나 누락되었습니다.");
+                        })
+                )
                 .authorizeHttpRequests(auth -> {
+                    auth.dispatcherTypeMatchers(
+                            jakarta.servlet.DispatcherType.ASYNC,
+                            jakarta.servlet.DispatcherType.ERROR
+                    ).permitAll();
+
                     auth.requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll();
                     auth.requestMatchers("/api/auth/google").permitAll();
 
@@ -61,7 +75,7 @@ public class SecurityConfig {
         config.setAllowedOriginPatterns(List.of("*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
-        config.setExposedHeaders(List.of("Authorization"));
+        config.setExposedHeaders(List.of("Authorization", "Content-Disposition", "Content-Length"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

@@ -32,8 +32,8 @@ public class LlmAgentClient extends TextWebSocketHandler {
     private final String baseImage;
     private final ProjectCreateRequestDto requestDto;
 
-    // 무한 루프 폭주 방지를 위한 안전 장치 (최대 50턴 제한)
-    private static final int MAX_TURN_LIMIT = 50;
+    // 무한 루프 폭주 방지를 위한 안전 장치 (최대 100턴 제한)
+    private static final int MAX_TURN_LIMIT = 150;
     private int executionTurnCount = 0;
 
     // 이 세션(웹소켓 파이프라인) 동안 점진적 작업을 수행할 도커 컨테이너 고유 ID
@@ -170,7 +170,7 @@ public class LlmAgentClient extends TextWebSocketHandler {
         }
         else if ("DELETE_FILE".equals(action.getTool())) {
 
-            // [ 메인 로그 추ㅏㄱ] 파일 리팩토링 및 삭제
+            // [ 메인 로그 추가 ] 파일 리팩토링 및 삭제
             sendSystemLog("WARN", "[Action] 에이전트 리팩토링 - 파일 제거 요청 수신: " + action.getPath(), ProjectStatus.CODING);
 
             try {
@@ -189,6 +189,25 @@ public class LlmAgentClient extends TextWebSocketHandler {
                 observation = new AiModelMessage.Observation("OBSERVATION", "ERROR", 1, "", e.getMessage());
                 // [에러 로그]
                 sendSystemLog("ERROR", "[Fail] 파일 삭제 중 오류: " + action.getPath() + " | Reason: " + e.getMessage(), ProjectStatus.CODING);
+            }
+        }
+        else if ("READ_FILE".equals(action.getTool())) {
+            // [메인 로그 추가] 에이전트가 코드를 조회하는 시점 기록
+            sendSystemLog("INFO", "[Action] 소스 코드 파일 조회 중: " + action.getPath(), ProjectStatus.CODING);
+
+            try {
+                String fileContent = dockerAgentService.readFile(this.userId, this.uuid, action.getPath());
+
+                observation = new AiModelMessage.Observation("OBSERVATION", "SUCCESS", 0, fileContent, "");
+
+                sendSystemLog("INFO", "[Success] 파일 조회가 완료되었습니다: " + action.getPath(), ProjectStatus.CODING);
+
+            } catch (Exception e) {
+                log.error("[소켓-{}] 파일 조회 중 예외 발생: {}", uuid, action.getPath(), e);
+                observation = new AiModelMessage.Observation("OBSERVATION", "ERROR", 1, "", "파일을 읽을 수 없습니다: " + e.getMessage());
+
+                // [에러 로그] 파일이 없거나 디렉토리 권한이 없을 때
+                sendSystemLog("ERROR", "[Fail] 파일 조회 실패: " + action.getPath() + " | Reason: " + e.getMessage(), ProjectStatus.CODING);
             }
         }
         else if ("EXECUTE_CMD".equals(action.getTool())) {

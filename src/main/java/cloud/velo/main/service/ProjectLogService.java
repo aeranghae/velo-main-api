@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -67,12 +68,12 @@ public class ProjectLogService {
             }
         }
 
-        // redis 로그 복원
+        // 2. Redis 로그 복원
         String redisKey = "project:logs:" + uuid;
         List<String> bufferedLogs = redisTemplate.opsForList().range(redisKey, 0, -1);
         if (bufferedLogs != null) {
             for (String raw : bufferedLogs) {
-                String[] parts = raw.split("\\|\\|", 4); // 🌟 4파트로 파싱
+                String[] parts = raw.split("\\|\\|", 4);
                 if (parts.length < 4) continue;
 
                 // ISO 표준 시간을 포멧터로 지정
@@ -85,10 +86,12 @@ public class ProjectLogService {
                 .uuid(project.getUuid())
                 .status(project.getStatus().name()) // "GENERATING" 같은 영어 이름
                 .statusDescription(project.getStatus().getDescription())
+                .status(project.getStatus().name())
                 .framework(project.getFramework())
                 .previousLogs(logBuilder.isEmpty() ? "[System] 아직 누적된 파이프라인 로그가 존재하지 않습니다." : logBuilder.toString())
                 .build();
     }
+
     /**
      * 2. FastAPI 웹훅 로그 수신부 (Redis 버퍼링 + 밀어내기 덤프 메커니즘 탑재)
      */
@@ -127,6 +130,7 @@ public class ProjectLogService {
         // 만료 시간을 24시간으로 설정
         redisTemplate.expire(redisKey, java.time.Duration.ofDays(1));
 
+        // 2. SSE 실시간 스트리밍
         SseEmitter emitter = emitters.get(uuid);
 
         if (emitter != null) {

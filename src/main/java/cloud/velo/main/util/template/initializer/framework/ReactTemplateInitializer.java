@@ -29,18 +29,18 @@ public class ReactTemplateInitializer extends BaseTemplateInitializer {
                 "public"
         ));
 
-        writeFile(rootPath.resolve("src/main.tsx"), mainTsx());
-        writeFile(rootPath.resolve("src/App.tsx"), appTsx());
-        writeFile(rootPath.resolve("src/router/index.tsx"), routerIndex());
-        writeFile(rootPath.resolve("src/services/api.ts"), apiTs());
-        writeFile(rootPath.resolve("src/types/index.ts"), typesIndex());
-        writeFile(rootPath.resolve("index.html"), indexHtml(projectName));
-        writeFile(rootPath.resolve("package.json"), packageJson(projectName));
-        writeFile(rootPath.resolve("vite.config.ts"), viteConfig());
-        writeFile(rootPath.resolve("tsconfig.json"), tsconfig());
-        writeFile(rootPath.resolve(".env.example"), envExample());
-        writeFile(rootPath.resolve(".gitignore"), reactGitignore());
-        writeFile(rootPath.resolve("README.md"), readme(projectName, dto.getLicense()));
+        //writeFile(rootPath.resolve("src/main.tsx"), mainTsx());
+        //writeFile(rootPath.resolve("src/App.tsx"), appTsx());
+        //writeFile(rootPath.resolve("src/router/index.tsx"), routerIndex());
+        //writeFile(rootPath.resolve("src/services/api.ts"), apiTs());
+        //writeFile(rootPath.resolve("src/types/index.ts"), typesIndex());
+        //writeFile(rootPath.resolve("index.html"), indexHtml(projectName));
+        //writeFile(rootPath.resolve("package.json"), packageJson(projectName));
+        //writeFile(rootPath.resolve("vite.config.ts"), viteConfig());
+        //writeFile(rootPath.resolve("tsconfig.json"), tsconfig());
+        //writeFile(rootPath.resolve(".env.example"), envExample());
+        //writeFile(rootPath.resolve(".gitignore"), reactGitignore());
+        //writeFile(rootPath.resolve("README.md"), readme(projectName, dto.getLicense()));
     }
 
     private String mainTsx() {
