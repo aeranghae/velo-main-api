@@ -3,10 +3,8 @@ package cloud.velo.main.service;
 import cloud.velo.main.controller.dto.ProjectLogResponseDto;
 import cloud.velo.main.controller.dto.ProjectLogSaveDto;
 import cloud.velo.main.domain.Project;
-import cloud.velo.main.domain.ProjectLog;
 import cloud.velo.main.domain.ProjectStatus;
 import cloud.velo.main.domain.User;
-import cloud.velo.main.repository.ProjectLogRepository;
 import cloud.velo.main.repository.ProjectRepository;
 import cloud.velo.main.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +17,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,7 +29,6 @@ public class ProjectLogService {
 
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
-    private final ProjectLogRepository projectLogRepository;
 
     // UUID 대신 "userId:projectId" 조합을 Key로 사용
     private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
@@ -59,9 +57,14 @@ public class ProjectLogService {
         StringBuilder logBuilder = new StringBuilder();
 
         // DB 로그 복원
-        List<ProjectLog> dbLogs = projectLogRepository.findLogsByUserIdAndProjectId(currentUser.getId(), project.getId());
-        for (ProjectLog bl : dbLogs) {
-            logBuilder.append(String.format("[%s] %s\n", bl.getLogLevel(), bl.getMessage()));
+        List<Map<String, Object>> dbLogs = project.getPipelineLogs();
+        if (dbLogs != null && !dbLogs.isEmpty()) {
+            for (Map<String, Object> logMap : dbLogs) {
+                logBuilder.append(String.format("[%s][%s] %s\n",
+                        logMap.get("level"),
+                        logMap.get("time"),
+                        logMap.get("message")));
+            }
         }
 
         // redis 로그 복원
@@ -81,6 +84,7 @@ public class ProjectLogService {
         return ProjectLogResponseDto.builder()
                 .uuid(project.getUuid())
                 .status(project.getStatus().name()) // "GENERATING" 같은 영어 이름
+                .statusDescription(project.getStatus().getDescription())
                 .framework(project.getFramework())
                 .previousLogs(logBuilder.isEmpty() ? "[System] 아직 누적된 파이프라인 로그가 존재하지 않습니다." : logBuilder.toString())
                 .build();
@@ -101,10 +105,18 @@ public class ProjectLogService {
         ProjectStatus incomingStatus = ProjectStatus.CREATED;
         if (dto.getStatus() != null) {
             try {
-                incomingStatus = ProjectStatus.valueOf(dto.getStatus().toUpperCase());
+                String statusStr = dto.getStatus().toUpperCase();
+
+                if ("COMPLETEDE".equals(statusStr)) {
+                    statusStr = "COMPLETED";
+                }
+                incomingStatus = ProjectStatus.valueOf(statusStr);
+
             } catch (IllegalArgumentException e) {
-                log.warn("정의되지 않은 상태 값이 수신되었습니다: {}", dto.getStatus());
-                return;
+                // 2. return을 삭제하고, 로그만 남긴 뒤 기본값으로 진행하거나
+                // 아예 상태값 변환에 실패해도 덤프 로직을 탈 수 있도록 구조를 잡아야 합니다.
+                log.warn("정의되지 않은 상태 값이 수신되었습니다. 기본값(CREATED)으로 처리합니다: {}", dto.getStatus());
+                incomingStatus = ProjectStatus.CREATED;
             }
         }
 
@@ -133,29 +145,28 @@ public class ProjectLogService {
             List<String> rawLogs = redisTemplate.opsForList().range(redisKey, 0, -1);
 
             if (rawLogs != null && !rawLogs.isEmpty()) {
-
                 try {
                     Project project = projectRepository.findByUuid(uuid).orElseThrow();
-                    User owner = project.getUser();
 
-                    List<ProjectLog> bulkLogEntities = new ArrayList<>();
+                    // 파싱한 로그를 JSONB용 Map 구조로 담기
+                    List<Map<String, Object>> jsonbLogs = new ArrayList<>();
                     for (String raw : rawLogs) {
                         String[] parts = raw.split("\\|\\|", 4);
+                        if (parts.length < 4) continue;
 
-                        LocalDateTime createdAt = LocalDateTime.parse(parts[1],ISO_FORMATTER);
-                        ProjectStatus rowStatus = ProjectStatus.valueOf(parts[2]);
+                        String timeStr = LocalDateTime.parse(parts[1], ISO_FORMATTER).format(TIME_FORMATTER);
 
-                        bulkLogEntities.add(ProjectLog.builder()
-                                .user(owner)
-                                .project(project)
-                                .logLevel(parts[0])
-                                .status(rowStatus)
-                                .createdAt(createdAt)
-                                .message(parts[3])
-                                .build());
+                        Map<String, Object> logMap = new HashMap<>();
+                        logMap.put("level", parts[0]);
+                        logMap.put("time", timeStr);
+                        logMap.put("status", parts[2]);
+                        logMap.put("message", parts[3]);
+
+                        jsonbLogs.add(logMap);
                     }
-                projectLogRepository.saveAll(bulkLogEntities);
-                project.updateStatus(incomingStatus); // 프로젝트 최종상태 업데이트
+                    project.getPipelineLogs().addAll(jsonbLogs);
+                    project.updateStatus(incomingStatus);
+
                     log.info("[DB] 최종 로그 일괄 덤프 완료. 루프를 성공적으로 마감합니다.");
             } catch (Exception e) {
                 log.error("[🚨DB Error] 최종 로그를 DB에 백업하는 과정에서 실패했습니다.", e);
@@ -206,8 +217,6 @@ public class ProjectLogService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 프로젝트입니다. ID: " + projectId));
 
         clearRedisLogCache(project.getUuid());
-       // 3. 기존 DB 데이터 삭제 진행
-        projectLogRepository.deleteByProjectId(projectId);
     }
 
     private void clearRedisLogCache(String uuid) {

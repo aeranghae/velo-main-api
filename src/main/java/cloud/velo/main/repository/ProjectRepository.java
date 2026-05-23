@@ -3,6 +3,7 @@ package cloud.velo.main.repository;
 import cloud.velo.main.domain.Project;
 import cloud.velo.main.domain.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -20,4 +21,8 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     long getTotalStorageSizeByUser(@Param("user") User user);
 
     Optional<Project> findByUuidAndUser(String uuid, User user);
+
+    @Modifying
+    @Query(value = "UPDATE project SET pipeline_logs = pipeline_logs || :newLogJson::jsonb WHERE uuid = :uuid", nativeQuery = true)
+    void appendPipelineLog(@Param("uuid") String uuid, @Param("newLogJson") String newLogJson);
 }

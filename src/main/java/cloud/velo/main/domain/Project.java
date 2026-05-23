@@ -133,4 +133,8 @@ public class Project {
         this.status = status;
         this.lastModifiedAt = LocalDateTime.now();
     }
+
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Column(name = "pipeline_logs", columnDefinition = "jsonb")
+    private List<java.util.Map<String, Object>> pipelineLogs = new ArrayList<>();
 }
