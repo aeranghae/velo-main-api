@@ -61,10 +61,10 @@ public class ProjectLogService {
         List<Map<String, Object>> dbLogs = project.getPipelineLogs();
         if (dbLogs != null && !dbLogs.isEmpty()) {
             for (Map<String, Object> logMap : dbLogs) {
-                logBuilder.append(String.format("[%s][%s] %s\n",
-                        logMap.get("level"),
-                        logMap.get("time"),
-                        logMap.get("message")));
+                String level = String.valueOf(logMap.getOrDefault("level", "INFO"));
+                String time = String.valueOf(logMap.getOrDefault("time", "00:00:00"));
+                String message = String.valueOf(logMap.getOrDefault("message", ""));
+                logBuilder.append(String.format("[%s][%s] %s\n", level, time, message));
             }
         }
 
@@ -86,7 +86,6 @@ public class ProjectLogService {
                 .uuid(project.getUuid())
                 .status(project.getStatus().name()) // "GENERATING" 같은 영어 이름
                 .statusDescription(project.getStatus().getDescription())
-                .status(project.getStatus().name())
                 .framework(project.getFramework())
                 .previousLogs(logBuilder.isEmpty() ? "[System] 아직 누적된 파이프라인 로그가 존재하지 않습니다." : logBuilder.toString())
                 .build();
