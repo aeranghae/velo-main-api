@@ -68,7 +68,7 @@ public class ProjectLogService {
             }
         }
 
-        // 2. Redis 로그 복원
+        // 2. Redis 로그 복1
         String redisKey = "project:logs:" + uuid;
         List<String> bufferedLogs = redisTemplate.opsForList().range(redisKey, 0, -1);
         if (bufferedLogs != null) {
