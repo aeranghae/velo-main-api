@@ -56,7 +56,6 @@ public class LlmAgentClient extends TextWebSocketHandler {
         this.projectLogService = projectLogService;
     }
 
-    //
     private void sendSystemLog(String logLevel, String message, ProjectStatus status) {
         ProjectLogSaveDto logDto = new ProjectLogSaveDto();
         logDto.setUuid(this.uuid);
