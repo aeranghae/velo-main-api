@@ -1,12 +1,10 @@
 package cloud.velo.main.docker.websocket;
 
 import cloud.velo.main.controller.dto.ProjectCreateRequestDto;
-import cloud.velo.main.controller.dto.ProjectLogSaveDto;
 import cloud.velo.main.controller.dto.ProjectNodeResponse;
 import cloud.velo.main.docker.dto.AiModelMessage;
 import cloud.velo.main.docker.service.DockerAgentService;
 import cloud.velo.main.event.ProjectLogEvent;
-import cloud.velo.main.service.ProjectLogService;
 import cloud.velo.main.service.StorageService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
