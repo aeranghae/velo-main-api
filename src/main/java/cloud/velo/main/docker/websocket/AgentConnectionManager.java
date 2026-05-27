@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.socket.client.WebSocketConnectionManager;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import tools.jackson.databind.ObjectMapper;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.io.File;
 import java.util.Map;
@@ -24,7 +25,7 @@ public class AgentConnectionManager {
     private final DockerAgentService dockerAgentService;
     private final ObjectMapper objectMapper;
     private final StorageService storageService;
-    private final ProjectLogService projectLogService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${velo.storage.path}")
     private String baseStoragePath; // 주입받은 기본 경로 활용
@@ -60,7 +61,7 @@ public class AgentConnectionManager {
                 email,
                 baseImage,
                 requestDto,
-                projectLogService);
+                eventPublisher);
 
         // 3. 하드코딩 제거: 주입받은 serverUrl 변수를 뼈대로 동적 URL 구성
         // serverUrl 값 끝에 '/' 유무에 대비해 유연하게 붙도록 처리 가능 (예: serverUrl이 ws://localhost:8000/agent?uuid=%s 일 때)

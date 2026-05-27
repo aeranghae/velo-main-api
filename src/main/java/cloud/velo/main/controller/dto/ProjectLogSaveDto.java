@@ -15,4 +15,5 @@ public class ProjectLogSaveDto {
     private String status;  // GENERATING, COMPLETED, FAILED
     private String logLevel;
     private String message;
+    private boolean isActivityFeed;
 }

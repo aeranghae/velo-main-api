@@ -73,7 +73,7 @@ public class ProjectLogService {
         List<String> bufferedLogs = redisTemplate.opsForList().range(redisKey, 0, -1);
         if (bufferedLogs != null) {
             for (String raw : bufferedLogs) {
-                String[] parts = raw.split("\\|\\|", 4);
+                String[] parts = raw.split("\\|\\|", 5);
                 if (parts.length < 4) continue;
 
                 // ISO 표준 시간을 포멧터로 지정
@@ -103,27 +103,10 @@ public class ProjectLogService {
         // 로그 발생 시점 서버 시간
         String createdAtStr = LocalDateTime.now().format(ISO_FORMATTER);
 
-
-        ProjectStatus incomingStatus = ProjectStatus.CREATED;
-        if (dto.getStatus() != null) {
-            try {
-                String statusStr = dto.getStatus().toUpperCase();
-
-                if ("COMPLETEDE".equals(statusStr)) {
-                    statusStr = "COMPLETED";
-                }
-                incomingStatus = ProjectStatus.valueOf(statusStr);
-
-            } catch (IllegalArgumentException e) {
-                // 2. return을 삭제하고, 로그만 남긴 뒤 기본값으로 진행하거나
-                // 아예 상태값 변환에 실패해도 덤프 로직을 탈 수 있도록 구조를 잡아야 합니다.
-                log.warn("정의되지 않은 상태 값이 수신되었습니다. 기본값(CREATED)으로 처리합니다: {}", dto.getStatus());
-                incomingStatus = ProjectStatus.CREATED;
-            }
-        }
+        ProjectStatus incomingStatus = parseStatus(dto.getStatus());
 
         // Redis 버퍼 리스트에 실시간 적재 시 STATUS(incomingStatus)도 같이 4파트로 조립해서 저장!
-        String logLine = dto.getLogLevel() + "||" + createdAtStr + "||" + incomingStatus.name() + "||" + dto.getMessage();
+        String logLine = dto.getLogLevel() + "||" + createdAtStr + "||" + incomingStatus.name() + "||" + dto.getMessage() + "||" + dto.isActivityFeed();;
         redisTemplate.opsForList().rightPush(redisKey, logLine);
 
         // 만료 시간을 24시간으로 설정
@@ -154,7 +137,7 @@ public class ProjectLogService {
                     // 파싱한 로그를 JSONB용 Map 구조로 담기
                     List<Map<String, Object>> jsonbLogs = new ArrayList<>();
                     for (String raw : rawLogs) {
-                        String[] parts = raw.split("\\|\\|", 4);
+                        String[] parts = raw.split("\\|\\|", 5);
                         if (parts.length < 4) continue;
 
                         String timeStr = LocalDateTime.parse(parts[1], ISO_FORMATTER).format(TIME_FORMATTER);
@@ -220,6 +203,20 @@ public class ProjectLogService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 프로젝트입니다. ID: " + projectId));
 
         clearRedisLogCache(project.getUuid());
+    }
+
+    // COMPLETEDE 오타 검증
+    private ProjectStatus parseStatus(String status) {
+        if (status == null) return ProjectStatus.CREATED;
+
+        try {
+            // "COMPLETEDE" 오타 방어 및 대문자 변환
+            String s = status.toUpperCase().replace("COMPLETEDE", "COMPLETED");
+            return ProjectStatus.valueOf(s);
+        } catch (Exception e) {
+            log.warn("정의되지 않은 상태 값이 수신되었습니다. 기본값(CREATED)으로 처리합니다: {}", status);
+            return ProjectStatus.CREATED;
+        }
     }
 
     private void clearRedisLogCache(String uuid) {
