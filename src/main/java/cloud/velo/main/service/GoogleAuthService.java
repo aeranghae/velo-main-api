@@ -68,6 +68,10 @@ public class GoogleAuthService {
                         .role(Role.USER) // 혹은 기본 권한 설정
                         .build()); // 신규 회원이면 객체 생성
 
-        return userRepository.save(user); // DB에 저장
+        User saved = userRepository.save(user);
+        if (saved.getModel() != null) {
+            saved.getModel().getModelName(); // 트랜잭션 안에서 proxy 초기화
+        }
+        return saved;
     }
 }

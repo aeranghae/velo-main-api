@@ -70,7 +70,7 @@ public class StorageService {
     @PostConstruct
     public void init() {
         this.nfsRootPath = Paths.get(baseStoragePath).normalize();
-        log.info("StorageService 가동 - 설정된 NFS 루트 경로: {}", this.nfsRootPath);
+        //log.info("StorageService 가동 - 설정된 NFS 루트 경로: {}", this.nfsRootPath);
     }
 
     // 생성 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
