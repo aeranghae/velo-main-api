@@ -89,4 +89,8 @@ public class AgentConnectionManager {
             log.info("[Manager] 프로젝트 세션 종료 및 웹소켓 반환 완료. UUID: {}", uuid);
         }
     }
+
+    public boolean isProjectGenerating(String uuid) {
+        return activeConnections.containsKey(uuid);
+    }
 }

@@ -25,4 +25,10 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     @Modifying
     @Query(value = "UPDATE project SET pipeline_logs = pipeline_logs || :newLogJson::jsonb WHERE uuid = :uuid", nativeQuery = true)
     void appendPipelineLog(@Param("uuid") String uuid, @Param("newLogJson") String newLogJson);
+
+    void deleteAllByUser(User user);
+
+    @Modifying
+    @Query("delete from Project p where p.id in :ids")
+    void deleteAllByIdIn(@Param("ids") List<Long> ids);
 }

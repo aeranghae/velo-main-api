@@ -1,5 +1,6 @@
 package cloud.velo.main.service;
 
+import cloud.velo.main.client.AgentConnectionManager;
 import cloud.velo.main.dto.response.FrameworkStatisticsResponse;
 import cloud.velo.main.dto.request.ProjectCreateRequest;
 import cloud.velo.main.dto.response.ProjectNodeResponse;
@@ -52,6 +53,7 @@ public class StorageService {
     private final ProjectLogService projectLogService;
     private final TemplateInitializerFactory factory;
     private final CacheManager cacheManager;
+    private final AgentConnectionManager agentConnectionManager;
 
     @Value("${velo.storage.path}")
     private String baseStoragePath;
@@ -191,6 +193,11 @@ public class StorageService {
     @Transactional
     @CacheEvict(value = "projectList", key = "#user.id")
     public void deleteProject(User user, String uuid) {
+        // [추가] 프로젝트가 생성 중인지 검증 (agentConnectionManager 주입 필요)
+        if (agentConnectionManager.isProjectGenerating(uuid)) {
+            throw new IllegalStateException("현재 프로젝트가 생성 중이므로 삭제할 수 없습니다.");
+        }
+
         Project project = projectRepository.findByUuid(uuid)
                 .filter(p -> p.getUser().getId().equals(user.getId()))
                 .orElseThrow(() -> new IllegalArgumentException("프로젝트를 찾을 수 없거나 권한이 없습니다."));
@@ -203,6 +210,40 @@ public class StorageService {
         // 물리 폴더 삭제
         Path projectPath = Paths.get(baseStoragePath, String.valueOf(user.getId()), uuid);
         deleteDirectoryRecursive(projectPath);
+    }
+
+    // 프로젝트 전체 삭제
+    @Transactional
+    @CacheEvict(value = "projectList", key = "#user.id")
+    public void deleteAllProjects(User user) {
+        // 1. 사용자의 모든 프로젝트 조회
+        List<Project> userProjects = projectRepository.findByUser(user);
+
+        if (userProjects.isEmpty()) {
+            return; // 삭제할 프로젝트가 없으면 조기 종료
+        }
+
+        // 2. 생성 중이 아닌 프로젝트의 ID 목록(deletableProjectIds) 추출
+        List<Long> deletableProjectIds = userProjects.stream()
+                .filter(project -> !agentConnectionManager.isProjectGenerating(project.getUuid()))
+                .map(Project::getId)
+                .collect(Collectors.toList());
+
+        // 만약 삭제 가능한 프로젝트가 하나도 없다면 종료
+        if (deletableProjectIds.isEmpty()) {
+            return;
+        }
+
+        // 4. DB에서 해당 프로젝트들 일괄 벌크 삭제 (deletableProjectIds 활용)
+        projectRepository.deleteAllByIdIn(deletableProjectIds);
+
+        // 5. 물리 폴더 삭제를 위해 대상 프로젝트만 필터링하여 디렉토리 삭제
+        userProjects.stream()
+                .filter(project -> deletableProjectIds.contains(project.getId()))
+                .forEach(project -> {
+                    Path projectPath = Paths.get(baseStoragePath, String.valueOf(user.getId()), project.getUuid());
+                    deleteDirectoryRecursive(projectPath);
+                });
     }
 
     public byte[] downloadProject(User user, String uuid) {
