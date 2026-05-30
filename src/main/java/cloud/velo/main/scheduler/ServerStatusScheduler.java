@@ -40,10 +40,11 @@ public class ServerStatusScheduler {
                 .usedMemory(totalMemory - freeMemory)
                 .build();
 
+        // MediaType.APPLICATION_JSON 을 명시 (직렬화)
         sseEmitterManager.broadcast(
                 SseEmitter.event()
                         .name("server-status")
-                        .data(status)
+                        .data(status, org.springframework.http.MediaType.APPLICATION_JSON)
         );
     }
 }
