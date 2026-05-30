@@ -1,11 +1,13 @@
 package cloud.velo.main.client;
 
 import cloud.velo.main.dto.request.ProjectCreateRequest;
+import cloud.velo.main.event.ProjectDeleteVerificationEvent;
 import cloud.velo.main.service.DockerAgentService;
 import cloud.velo.main.service.StorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.client.WebSocketConnectionManager;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
@@ -92,5 +94,18 @@ public class AgentConnectionManager {
 
     public boolean isProjectGenerating(String uuid) {
         return activeConnections.containsKey(uuid);
+    }
+
+    @EventListener
+    public void verifyProjectNotActive(ProjectDeleteVerificationEvent event) {
+        if (isProjectGenerating(event.uuid())) {
+            // 전체 삭제 스트림 안에서 호출된 경우 (isGenerating 장부가 들어온 경우)
+            if (event.isGenerating() != null) {
+                event.isGenerating().set(true); // "얘 지금 작업 중임" 이라고 마킹
+            } else {
+                // 기존 단건 삭제일 때는 바로 예외 발생시켜 튕겨내기
+                throw new IllegalStateException("현재 프로젝트가 생성 중이므로 삭제할 수 없습니다.");
+            }
+        }
     }
 }

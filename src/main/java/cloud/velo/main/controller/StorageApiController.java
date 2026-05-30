@@ -166,25 +166,39 @@ public class StorageApiController {
         return ResponseEntity.ok(storageService.updateProjectName(user, uuid, newName));
     }
 
-    // 프로젝트 삭제
+    // 프로젝트 단건 삭제
     @DeleteMapping("/projects/{uuid}")
-    public ResponseEntity<Void> deleteProject(@AuthenticationPrincipal String email,
-                                              @PathVariable String uuid) {
+    public ResponseEntity<Map<String, Object>> deleteProject(@AuthenticationPrincipal String email,
+                                                             @PathVariable String uuid) {
         User user = userRepository.findByEmail(email).orElseThrow();
-        storageService.deleteProject(user, uuid);
-        return ResponseEntity.noContent().build();
+
+        // 서비스로부터 삭제된 결과 수령
+        List<String> deletedUuids = storageService.deleteProject(user, uuid);
+
+        Map<String, Object> response = Map.of(
+                "message", "프로젝트가 성공적으로 삭제되었습니다.",
+                "deletedUuids", deletedUuids
+        );
+
+        return ResponseEntity.ok(response); // 204 No Content 대신 200 OK로 데이터를 명확히 전달
     }
 
     // 프로젝트 전체 삭제
     @DeleteMapping("/projects/clean")
-    public ResponseEntity<String> deleteAllProjects(@AuthenticationPrincipal String email) {
+    public ResponseEntity<Map<String, Object>> deleteAllProjects(@AuthenticationPrincipal String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
-        storageService.deleteAllProjects(user);
+        // 생성 중이라서 지워지지 않은 녀석들을 필터링하고 '실제 지워진 리스트'만 받아옵니다.
+        List<String> deletedUuids = storageService.deleteAllProjects(user);
 
-        // 200 OK 상태 코드와 함께 성공 메시지 반환
-        return ResponseEntity.ok("모든 프로젝트가 초기화 되었습니다.");
+        Map<String, Object> response = Map.of(
+                "message", "프로젝트 일괄 삭제 처리가 완료되었습니다.",
+                "deletedUuids", deletedUuids,
+                "deletedCount", deletedUuids.size()
+        );
+
+        return ResponseEntity.ok(response);
     }
 
     // 프로젝트 다운
