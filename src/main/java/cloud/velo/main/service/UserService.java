@@ -1,6 +1,6 @@
 package cloud.velo.main.service;
 
-import cloud.velo.main.controller.dto.UserResponseDto;
+import cloud.velo.main.dto.response.UserResponse;
 import cloud.velo.main.domain.User;
 import cloud.velo.main.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,12 +30,12 @@ public class UserService {
 
     @Transactional(readOnly = true)
     @Cacheable(value = "userCache", key = "#email", cacheManager = "cacheManager")
-    public UserResponseDto getUserInfoByEmail(String email) {
+    public UserResponse getUserInfoByEmail(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("해당 사용자가 없습니다. email=" + email));
 
         // 유저 엔티티를 응답 DTO로 변환하여 반환
-        return new UserResponseDto(
+        return new UserResponse(
                 user.getName(),
                 user.getEmail(),
                 user.getPicture(),

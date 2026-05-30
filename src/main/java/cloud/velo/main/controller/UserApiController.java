@@ -1,7 +1,7 @@
 package cloud.velo.main.controller;
 
-import cloud.velo.main.controller.dto.SignupRequestDto;
-import cloud.velo.main.controller.dto.UserResponseDto;
+import cloud.velo.main.dto.request.SignupRequest;
+import cloud.velo.main.dto.response.UserResponse;
 import cloud.velo.main.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +17,7 @@ public class UserApiController {
     private final UserService userService;
 
     @PostMapping("/api/user/signup")
-    public ResponseEntity<String> signup(@RequestBody SignupRequestDto requestDto,
+    public ResponseEntity<String> signup(@RequestBody SignupRequest requestDto,
                                          @AuthenticationPrincipal String email) { // JWT 필터에서 등록한 email
 
         // 1. 인증 체크
@@ -44,7 +44,7 @@ public class UserApiController {
         //log.info("내 정보 조회 요청 시작 - email: {}", email); // 로그 남기기
 
         try {
-            UserResponseDto userInfo = userService.getUserInfoByEmail(email);
+            UserResponse userInfo = userService.getUserInfoByEmail(email);
             return ResponseEntity.ok(userInfo);
         } catch (Exception e) {
             // 에러 발생 시 원인을 정확히 찍어줍니다.
@@ -54,7 +54,7 @@ public class UserApiController {
     }
 
     @PatchMapping("/api/user/nickname")
-    public ResponseEntity<String> updateNickname(@RequestBody SignupRequestDto requestDto,
+    public ResponseEntity<String> updateNickname(@RequestBody SignupRequest requestDto,
                                                  @AuthenticationPrincipal String email) {
         if (email == null) {
             return ResponseEntity.status(401).body("인증 정보가 없습니다.");

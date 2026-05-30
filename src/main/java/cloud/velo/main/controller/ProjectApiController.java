@@ -1,8 +1,7 @@
 package cloud.velo.main.controller;
 
-import cloud.velo.main.controller.dto.ProjectCreateRequestDto;
-import cloud.velo.main.controller.dto.ProjectResponseDto;
-import cloud.velo.main.controller.dto.ProjectLogResponseDto;
+import cloud.velo.main.dto.request.ProjectCreateRequest;
+import cloud.velo.main.dto.response.ProjectResponse;
 import cloud.velo.main.domain.User;
 import cloud.velo.main.repository.ProjectRepository;
 import cloud.velo.main.repository.UserRepository;
@@ -31,8 +30,8 @@ public class ProjectApiController {
      * 프로젝트 생성 시작 엔드포인트
      */
     @PostMapping("/projects/generate")
-    public ResponseEntity<ProjectResponseDto> generateProject(@AuthenticationPrincipal String email,
-                                                              @RequestBody ProjectCreateRequestDto requestDto) {
+    public ResponseEntity<ProjectResponse> generateProject(@AuthenticationPrincipal String email,
+                                                           @RequestBody ProjectCreateRequest requestDto) {
         // 1. 유저 조회
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("유저 정보를 찾을 수 없습니다."));
@@ -46,7 +45,7 @@ public class ProjectApiController {
 
         // 2. 기본 폴더 및 프로젝트 엔티티 생성 (기존 기능 활용)
         // storageService에서 UUID 기반 폴더 생성 + 기본 프레임워크 파일 추가
-        ProjectResponseDto newProject = storageService.createProject(user, requestDto);
+        ProjectResponse newProject = storageService.createProject(user, requestDto);
         // TODO: 구현안된 기능으로 요청했을 경우 프로세스 종료
         if (newProject == null) {
             return ResponseEntity.status(429)

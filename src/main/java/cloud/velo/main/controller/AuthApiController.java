@@ -1,9 +1,9 @@
 package cloud.velo.main.controller;
 
-import cloud.velo.main.config.auth.JwtTokenProvider; // 추가됨!
+import cloud.velo.main.security.JwtTokenProvider; // 추가됨!
 import cloud.velo.main.domain.Role;
 import cloud.velo.main.domain.User;
-import cloud.velo.main.config.auth.dto.GoogleLoginRequest;
+import cloud.velo.main.dto.request.GoogleLoginRequest;
 import cloud.velo.main.service.GoogleAuthService;
 import cloud.velo.main.service.StorageService;
 import lombok.RequiredArgsConstructor;

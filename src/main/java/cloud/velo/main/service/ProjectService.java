@@ -1,9 +1,9 @@
 package cloud.velo.main.service;
 
-import cloud.velo.main.config.docker.DockerImageProperties;
-import cloud.velo.main.controller.dto.ProjectCreateRequestDto;
-import cloud.velo.main.docker.websocket.AgentConnectionManager;
+import cloud.velo.main.config.DockerImageProperties;
+import cloud.velo.main.dto.request.ProjectCreateRequest;
 import cloud.velo.main.domain.User;
+import cloud.velo.main.client.AgentConnectionManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -28,7 +28,7 @@ public class ProjectService {
      * 프로젝트 생성 완료 후 LLM 서버와 독립 세션을 맺고 도커 제어를 시작하는 비동기 트리거
      */
     @Async
-    public void startAutomationProcess(User user, String uuid, ProjectCreateRequestDto requestDto) {
+    public void startAutomationProcess(User user, String uuid, ProjectCreateRequest requestDto) {
         log.info("[Automation] 프로젝트 자동화 공정 트리거 가동 시작. UUID: {}", uuid);
 
         // 1. 사용자가 선택한 프레임워크/언어 스택에 따라 가동할 도커 베이스 이미지 결정
@@ -72,7 +72,7 @@ public class ProjectService {
     /**
      * 분기별로 나누어서 도커 이미지 결정
      */
-    private String setDockerImage(ProjectCreateRequestDto requestDto){
+    private String setDockerImage(ProjectCreateRequest requestDto){
         //  분기 검증
         if ("FULL_STACK".equals(requestDto.getArchitecture_type())) {
 

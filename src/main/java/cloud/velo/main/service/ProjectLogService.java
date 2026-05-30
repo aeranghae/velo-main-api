@@ -1,7 +1,7 @@
 package cloud.velo.main.service;
 
-import cloud.velo.main.controller.dto.ProjectLogResponseDto;
-import cloud.velo.main.controller.dto.ProjectLogSaveDto;
+import cloud.velo.main.dto.response.ProjectLogResponse;
+import cloud.velo.main.dto.request.ProjectLogSaveRequest;
 import cloud.velo.main.domain.Project;
 import cloud.velo.main.domain.ProjectStatus;
 import cloud.velo.main.domain.User;
@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -43,7 +42,7 @@ public class ProjectLogService {
      * 1. 과거 로그 전체 조회 (DB 데이터 + Redis 임시 버퍼 데이터 실시간 병합 서빙)
      */
     @Transactional(readOnly = true)
-    public ProjectLogResponseDto getProjectMetadataAndLogs(String uuid, String loginEmail) {
+    public ProjectLogResponse getProjectMetadataAndLogs(String uuid, String loginEmail) {
 
         User currentUser = userRepository.findByEmail(loginEmail)
                 .orElseThrow(() -> new IllegalArgumentException("인증 장부에 등록되지 않은 유저입니다: " + loginEmail));
@@ -82,7 +81,7 @@ public class ProjectLogService {
             }
         }
 
-        return ProjectLogResponseDto.builder()
+        return ProjectLogResponse.builder()
                 .uuid(project.getUuid())
                 .status(project.getStatus().name()) // "GENERATING" 같은 영어 이름
                 .statusDescription(project.getStatus().getDescription())
@@ -95,7 +94,7 @@ public class ProjectLogService {
      * 2. FastAPI 웹훅 로그 수신부 (Redis 버퍼링 + 밀어내기 덤프 메커니즘 탑재)
      */
     @Transactional
-    public void saveWorkerLog(ProjectLogSaveDto dto) {
+    public void saveWorkerLog(ProjectLogSaveRequest dto) {
 
         String uuid = dto.getUuid();
         String redisKey = "project:logs:" + uuid;

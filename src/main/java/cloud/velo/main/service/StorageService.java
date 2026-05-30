@@ -1,9 +1,9 @@
 package cloud.velo.main.service;
 
-import cloud.velo.main.controller.dto.FrameworkStatisticsResponse;
-import cloud.velo.main.controller.dto.ProjectCreateRequestDto;
-import cloud.velo.main.controller.dto.ProjectNodeResponse;
-import cloud.velo.main.controller.dto.ProjectResponseDto;
+import cloud.velo.main.dto.response.FrameworkStatisticsResponse;
+import cloud.velo.main.dto.request.ProjectCreateRequest;
+import cloud.velo.main.dto.response.ProjectNodeResponse;
+import cloud.velo.main.dto.response.ProjectResponse;
 import cloud.velo.main.domain.AiModel;
 import cloud.velo.main.domain.Project;
 import cloud.velo.main.domain.ProjectNode;
@@ -34,9 +34,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -96,7 +93,7 @@ public class StorageService {
      */
     @Transactional
     @CacheEvict(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
-    public ProjectResponseDto createProject(User user, ProjectCreateRequestDto requestDto) {
+    public ProjectResponse createProject(User user, ProjectCreateRequest requestDto) {
 
         //  분기 검증
         if ("FULL_STACK".equals(requestDto.getArchitecture_type())) {
@@ -130,7 +127,7 @@ public class StorageService {
      */
     @Transactional
     @CacheEvict(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
-    public ProjectResponseDto updateProjectDescription(User user, String uuid, String description) {
+    public ProjectResponse updateProjectDescription(User user, String uuid, String description) {
 
         // 1. URL로 들어온 uuid와 인증된 유저 정보로 프로젝트 검증 및 조회
         Project project = projectRepository.findByUuidAndUser(uuid, user)
@@ -142,7 +139,7 @@ public class StorageService {
         // 3. 기존 규칙대로 NFS 디스크 스캔 없이 DB 데이터로만 즉시 DTO 조립 및 반환
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-        return ProjectResponseDto.builder()
+        return ProjectResponse.builder()
                 .projectName(project.getName())
                 .description(project.getDescription())
                 .status(project.getStatus().toString())
@@ -161,7 +158,7 @@ public class StorageService {
      */
     @Transactional
     @CacheEvict(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
-    public ProjectResponseDto updateProjectName(User user, String uuid, String newName) {
+    public ProjectResponse updateProjectName(User user, String uuid, String newName) {
         // 1. DB에서 프로젝트 조회 및 권한 검증
         Project project = projectRepository.findByUuid(uuid)
                 .filter(p -> p.getUser().getId().equals(user.getId())) // 본인 확인
@@ -173,7 +170,7 @@ public class StorageService {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
         // 무거운 convertToDto(NFS 디스크 스캔)를 버리고, 엔티티 컬럼 값으로 즉시 DTO 조립
-        return ProjectResponseDto.builder()
+        return ProjectResponse.builder()
                 .projectName(project.getName())
                 .description(project.getDescription())
                 .status(project.getStatus().toString())
@@ -254,7 +251,7 @@ public class StorageService {
      */
     @Transactional(readOnly = true)
     @Cacheable(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
-    public List<ProjectResponseDto> getUserProjectDetails(User user) {
+    public List<ProjectResponse> getUserProjectDetails(User user) {
         List<Project> projects = projectRepository.findByUserOrderByLastModifiedAtDesc(user);
 
         if (projects.isEmpty()) return Collections.emptyList();
@@ -262,7 +259,7 @@ public class StorageService {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
         return projects.stream()
-                .map(project -> ProjectResponseDto.builder()
+                .map(project -> ProjectResponse.builder()
                         .projectName(project.getName())
                         .description(project.getDescription())
                         .status(project.getStatus().toString())
@@ -466,7 +463,7 @@ public class StorageService {
 
         // 레디스의 'projectList' 캐시 저장소에서 이 유저의 캐시 데이터 꺼내기
         Cache cache = cacheManager.getCache("projectList");
-        List<ProjectResponseDto> cachedProjects = null;
+        List<ProjectResponse> cachedProjects = null;
 
         if (cache != null) {
             // key = "#user.id" 로 캐싱하셨으므로 user.getId()로 장부를 조회합니다.
@@ -484,7 +481,7 @@ public class StorageService {
 
         Map<String, Long> frameworkCounts = cachedProjects.stream()
                 .collect(Collectors.groupingBy(
-                        ProjectResponseDto::getFramework,
+                        ProjectResponse::getFramework,
                         Collectors.counting()
                 ));
 
@@ -503,14 +500,14 @@ public class StorageService {
     // 사용자 특정 Uuid 프로젝트 갱신
     @Transactional(readOnly = true)
     @CacheEvict(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
-    public ProjectResponseDto updateUserProjectDetails(String uuid, User user) {
+    public ProjectResponse updateUserProjectDetails(String uuid, User user) {
         // 앞서 안내해 드린 안전한 예외 처리 방식으로 변경하는 것을 추천합니다.
         Project project = projectRepository.findByUuidAndUser(uuid, user)
                 .orElseThrow(() -> new IllegalArgumentException("해당 프로젝트를 찾을 수 없습니다."));
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-        return ProjectResponseDto.builder()
+        return ProjectResponse.builder()
                 .projectName(project.getName())
                 .description(project.getDescription())
                 .status(project.getStatus().toString())
@@ -578,7 +575,7 @@ public class StorageService {
     /**
     *  프로젝트 요구사항 기반 프로젝트 프레임워크 지정 분기 편의 메서드
     */
-    private ProjectResponseDto setFrameworkForAddProjectAndFiles(User user, ProjectCreateRequestDto requestDto, String framework) {
+    private ProjectResponse setFrameworkForAddProjectAndFiles(User user, ProjectCreateRequest requestDto, String framework) {
         String uuid = UUID.randomUUID().toString();
 
         // 1. 프레임워크 검증 먼저 (폴더 생성 전에)
@@ -613,7 +610,7 @@ public class StorageService {
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-        return ProjectResponseDto.builder()
+        return ProjectResponse.builder()
                 .projectName(project.getName())
                 .description(project.getDescription())
                 .status(project.getStatus().toString())

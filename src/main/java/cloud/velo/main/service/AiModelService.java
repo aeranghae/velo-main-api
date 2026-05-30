@@ -1,8 +1,7 @@
 package cloud.velo.main.service;
 
-import cloud.velo.main.component.RateLimiterService;
-import cloud.velo.main.controller.dto.AiModelNameResponseDto;
-import cloud.velo.main.controller.dto.ProjectArchitectureResponse;
+import cloud.velo.main.dto.response.AiModelNameResponse;
+import cloud.velo.main.dto.response.ProjectArchitectureResponse;
 import cloud.velo.main.domain.AiModel;
 import cloud.velo.main.domain.User;
 import cloud.velo.main.repository.AiModelRepository;
@@ -37,9 +36,9 @@ public class AiModelService {
 
     @Cacheable(value = "aiModelList")
     @Transactional(readOnly = true)
-    public List<AiModelNameResponseDto> getActiveModelNames() {
+    public List<AiModelNameResponse> getActiveModelNames() {
         return aiModelRepository.findAllByIsActiveTrue().stream()
-                .map(model -> new AiModelNameResponseDto(
+                .map(model -> new AiModelNameResponse(
                         model.getModelName(),
                         model.getProvider()
                 ))

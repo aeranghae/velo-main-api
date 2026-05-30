@@ -1,6 +1,6 @@
 package cloud.velo.main.controller;
 
-import cloud.velo.main.controller.dto.ProjectLogResponseDto;
+import cloud.velo.main.dto.response.ProjectLogResponse;
 import cloud.velo.main.service.ProjectLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
@@ -22,11 +22,11 @@ public class ProjectLogController {
      * 시큐리티 가드 덕분에 email은 무조건 정식 인증 유저임이 보장됩니다.
      */
     @GetMapping("/{uuid}/status")
-    public ResponseEntity<ProjectLogResponseDto> getProjectLogs(
+    public ResponseEntity<ProjectLogResponse> getProjectLogs(
             @PathVariable String uuid,
             @AuthenticationPrincipal String email) {
 
-        ProjectLogResponseDto response = projectLogService.getProjectMetadataAndLogs(uuid, email);
+        ProjectLogResponse response = projectLogService.getProjectMetadataAndLogs(uuid, email);
         return ResponseEntity.ok(response);
     }
 

@@ -1,6 +1,6 @@
 package cloud.velo.main.event;
 
-import cloud.velo.main.controller.dto.ProjectLogSaveDto;
+import cloud.velo.main.dto.request.ProjectLogSaveRequest;
 import cloud.velo.main.service.ProjectLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +18,7 @@ public class ProjectLogListener {
     @EventListener
     public void handleProjectLogEvent(ProjectLogEvent event) {
         try {
-            ProjectLogSaveDto logDto = new ProjectLogSaveDto();
+            ProjectLogSaveRequest logDto = new ProjectLogSaveRequest();
             logDto.setUuid(event.uuid());
             logDto.setLogLevel(event.logLevel());
             logDto.setMessage(event.message());

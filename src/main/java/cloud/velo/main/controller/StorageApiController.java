@@ -1,9 +1,9 @@
 package cloud.velo.main.controller;
 
-import cloud.velo.main.controller.dto.FrameworkStatisticsResponse;
-import cloud.velo.main.controller.dto.ProjectCreateRequestDto;
-import cloud.velo.main.controller.dto.ProjectNodeResponse;
-import cloud.velo.main.controller.dto.ProjectResponseDto;
+import cloud.velo.main.dto.response.FrameworkStatisticsResponse;
+import cloud.velo.main.dto.request.ProjectCreateRequest;
+import cloud.velo.main.dto.response.ProjectNodeResponse;
+import cloud.velo.main.dto.response.ProjectResponse;
 import cloud.velo.main.domain.Project;
 import cloud.velo.main.domain.User;
 import cloud.velo.main.repository.ProjectRepository;
@@ -31,13 +31,13 @@ public class StorageApiController {
     // 생성 - - - - - - - - - - - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // 2. 새 프로젝트 생성 (UUID 기반)
     @PostMapping("/projects")
-    public ResponseEntity<ProjectResponseDto> createProject(@AuthenticationPrincipal String email,
-                                                            @RequestBody Map<String, String> request) {
+    public ResponseEntity<ProjectResponse> createProject(@AuthenticationPrincipal String email,
+                                                         @RequestBody Map<String, String> request) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
 
         // TODO: 나중에 DTO로 받도록 수정해야 겠습니다.
-        ProjectCreateRequestDto requestDto = new ProjectCreateRequestDto();
+        ProjectCreateRequest requestDto = new ProjectCreateRequest();
         requestDto.setProjectName(request.get("projectName"));
         requestDto.setModel(request.get("model"));
         requestDto.setFramework(request.get("framework"));
@@ -47,7 +47,7 @@ public class StorageApiController {
         }
 
         // Step 1: DB 메타데이터 저장 및 NFS 베이스 템플릿 복사 완료 (1차 트랜잭션 종료)
-        ProjectResponseDto newProject = storageService.createProject(user, requestDto);
+        ProjectResponse newProject = storageService.createProject(user, requestDto);
 
         try {
             // Step 2: [컨트롤러 단계] DB 커밋이 완료되었으므로 안전하게 빈 폴더 포함 파일 색인 진행
@@ -87,26 +87,26 @@ public class StorageApiController {
 
     // 개인 저장소 내 프로젝트 폴더 리스트 반환 (상세 정보 포함)
     @GetMapping("/projects")
-    public ResponseEntity<List<ProjectResponseDto>> getProjectList(@AuthenticationPrincipal String email) {
+    public ResponseEntity<List<ProjectResponse>> getProjectList(@AuthenticationPrincipal String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
 
         // 변경된 서비스 로직에 맞춰 User 객체를 직접 전달
-        List<ProjectResponseDto> projects = storageService.getUserProjectDetails(user);
+        List<ProjectResponse> projects = storageService.getUserProjectDetails(user);
 
         return ResponseEntity.ok(projects);
     }
 
     // 개인 저장소 내 프로젝트 폴더 리스트 반환 (상세 정보 포함)
     @GetMapping("/projects/{uuid}/update")
-    public ResponseEntity<ProjectResponseDto> updateProjectDetail(
+    public ResponseEntity<ProjectResponse> updateProjectDetail(
             @PathVariable String uuid,
             @AuthenticationPrincipal String email) {
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
 
-        ProjectResponseDto projectDetail = storageService.updateUserProjectDetails(uuid, user);
+        ProjectResponse projectDetail = storageService.updateUserProjectDetails(uuid, user);
 
         return ResponseEntity.ok(projectDetail);
     }
@@ -145,9 +145,9 @@ public class StorageApiController {
     // 수정 - - - - - - - - - - - - - - - - - - - -  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // 프로젝트 설명 변경
     @PatchMapping("/projects/{uuid}/description")
-    public ResponseEntity<ProjectResponseDto> updateProjectDescription(@AuthenticationPrincipal String email,
-                                                                       @PathVariable String uuid,
-                                                                       @RequestBody Map<String, String> request) {
+    public ResponseEntity<ProjectResponse> updateProjectDescription(@AuthenticationPrincipal String email,
+                                                                    @PathVariable String uuid,
+                                                                    @RequestBody Map<String, String> request) {
         User user = userRepository.findByEmail(email).orElseThrow();
         String description = request.get("description");
 
@@ -156,9 +156,9 @@ public class StorageApiController {
 
     // 프로젝트 이름 변경
     @PatchMapping("/projects/{uuid}")
-    public ResponseEntity<ProjectResponseDto> updateProject(@AuthenticationPrincipal String email,
-                                                            @PathVariable String uuid,
-                                                            @RequestBody Map<String, String> request) {
+    public ResponseEntity<ProjectResponse> updateProject(@AuthenticationPrincipal String email,
+                                                         @PathVariable String uuid,
+                                                         @RequestBody Map<String, String> request) {
         User user = userRepository.findByEmail(email).orElseThrow();
         String newName = request.get("newName");
 

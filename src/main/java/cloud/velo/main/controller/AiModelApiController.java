@@ -1,9 +1,9 @@
 package cloud.velo.main.controller;
 
-import cloud.velo.main.component.RateLimiterService;
-import cloud.velo.main.controller.dto.AiModelNameResponseDto;
-import cloud.velo.main.controller.dto.ProjectAnalysisRequest;
-import cloud.velo.main.controller.dto.ProjectArchitectureResponse;
+import cloud.velo.main.util.bucket.RateLimiter;
+import cloud.velo.main.dto.response.AiModelNameResponse;
+import cloud.velo.main.dto.request.ProjectAnalysisRequest;
+import cloud.velo.main.dto.response.ProjectArchitectureResponse;
 import cloud.velo.main.domain.User;
 import cloud.velo.main.repository.UserRepository;
 import cloud.velo.main.service.AiModelService;
@@ -26,15 +26,15 @@ public class AiModelApiController {
 
     private final AiModelService aiModelService;
     private final UserRepository userRepository;
-    private final RateLimiterService rateLimiterService;
+    private final RateLimiter rateLimiter;
 
     @GetMapping("/list")
-    public ResponseEntity<List<AiModelNameResponseDto>> getModelList(@AuthenticationPrincipal String email) {
+    public ResponseEntity<List<AiModelNameResponse>> getModelList(@AuthenticationPrincipal String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
 
         // log.info("AI 모델 리스트 조회 요청 - User: {}", user.getName());
-        List<AiModelNameResponseDto> modelList = aiModelService.getActiveModelNames();
+        List<AiModelNameResponse> modelList = aiModelService.getActiveModelNames();
         return ResponseEntity.ok(modelList);
     }
 
@@ -70,7 +70,7 @@ public class AiModelApiController {
             @RequestBody ProjectAnalysisRequest request) {
 
         // 1. 해당 유저의 버킷 가져오기
-        Bucket bucket = rateLimiterService.resolveBucket(email);
+        Bucket bucket = rateLimiter.resolveBucket(email);
 
         // 2. 토큰 1개 소비 시도 (분당 3회 제한 체크)
         if (!bucket.tryConsume(1)) {

@@ -1,7 +1,7 @@
 package cloud.velo.main.util.template;
 
-import cloud.velo.main.controller.dto.ProjectCreateRequestDto;
-import cloud.velo.main.util.template.initializer.license.LicenseGenerator;
+import cloud.velo.main.dto.request.ProjectCreateRequest;
+import cloud.velo.main.util.template.license.LicenseGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.IOException;
@@ -17,15 +17,15 @@ public abstract class BaseTemplateInitializer implements TemplateInitializer {
 
     // final로 막아서 각 initializer가 override 못하게
     @Override
-    public final void initialize(Path rootPath, ProjectCreateRequestDto dto) {
+    public final void initialize(Path rootPath, ProjectCreateRequest dto) {
         initTemplate(rootPath, dto); // 각 initializer 구현체가 실행
         writeLicense(rootPath, dto); // 라이선스는 항상 자동 생성
     }
 
     // initialize() 대신 이걸 각 initializer에서 구현
-    protected abstract void initTemplate(Path rootPath, ProjectCreateRequestDto dto);
+    protected abstract void initTemplate(Path rootPath, ProjectCreateRequest dto);
 
-    protected void writeLicense(Path rootPath, ProjectCreateRequestDto dto) {
+    protected void writeLicense(Path rootPath, ProjectCreateRequest dto) {
         String content = licenseGenerator.generate(dto.getLicense(), dto.getProjectName());
         if (!content.isBlank()) {
             writeFile(rootPath.resolve("LICENSE"), content);
