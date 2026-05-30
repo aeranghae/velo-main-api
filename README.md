@@ -1,7 +1,9 @@
 
 ---
+# 시스템 아키텍처
+![velo-system-architecture.gif](docs/assets/velo-system-architecture.gif)
 
-# Velo 설정
+# 설정
 
 ## 1. 데이터베이스 (PostgreSQL, Redis - Docker)
 
