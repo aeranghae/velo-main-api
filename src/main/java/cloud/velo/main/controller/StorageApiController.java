@@ -177,15 +177,15 @@ public class StorageApiController {
 
     // 프로젝트 전체 삭제
     @DeleteMapping("/projects/clean")
-    public ResponseEntity<Void> deleteAllProjects(@AuthenticationPrincipal String email) {
+    public ResponseEntity<String> deleteAllProjects(@AuthenticationPrincipal String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
         storageService.deleteAllProjects(user);
-        return ResponseEntity.noContent().build();
+
+        // 200 OK 상태 코드와 함께 성공 메시지 반환
+        return ResponseEntity.ok("모든 프로젝트가 초기화 되었습니다.");
     }
-
-
 
     // 프로젝트 다운
     @GetMapping("/{uuid}/download")
