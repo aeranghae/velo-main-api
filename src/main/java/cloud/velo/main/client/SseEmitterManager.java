@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 @Component
 public class SseEmitterManager {
@@ -14,7 +16,12 @@ public class SseEmitterManager {
     private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
 
     public void add(String id, SseEmitter emitter) {
-        emitters.put(id, emitter);
+        // [핵심 튜닝] 0.5초(500ms) 지연 후 안전하게 emitters 맵에 추가합니다.
+        // 이 처리를 통해 Controller가 return을 무사히 마치고 톰캣 연결이 생성됩니다.
+        CompletableFuture.delayedExecutor(500, TimeUnit.MILLISECONDS)
+                .execute(() -> {
+                    emitters.put(id, emitter);
+                });
     }
 
     public void remove(String id) {
@@ -36,6 +43,8 @@ public class SseEmitterManager {
             }
         });
 
-        deadEmitters.forEach(emitters::remove);
+        if (!deadEmitters.isEmpty()) {
+            deadEmitters.forEach(emitters::remove);
+        }
     }
 }
