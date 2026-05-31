@@ -1,5 +1,6 @@
 package cloud.velo.main.client;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -10,17 +11,28 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+@Slf4j
 @Component
 public class SseEmitterManager {
 
     private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
 
     public void add(String id, SseEmitter emitter) {
-        // [핵심 튜닝] 0.5초(500ms) 지연 후 안전하게 emitters 맵에 추가합니다.
-        // 이 처리를 통해 Controller가 return을 무사히 마치고 톰캣 연결이 생성됩니다.
+        // 혹시 모를 이전 찌꺼기 세션 청소
+        if (!emitters.isEmpty()) {
+            emitters.clear();
+        }
+
         CompletableFuture.delayedExecutor(500, TimeUnit.MILLISECONDS)
                 .execute(() -> {
-                    emitters.put(id, emitter);
+                    try {
+                        // 0.5초 사이에 클라이언트가 나가서 이미 끝난 세션인지 검사
+                        emitter.send(SseEmitter.event().comment("ping"));
+                        emitters.put(id, emitter);
+                        log.info("[스프링] 유효한 SSE 세션 등록 성공! ID: " + id);
+                    } catch (Exception e) {
+                        log.info("[스프링] 등록 전 이미 종료된 세션이라 폐기합니다. ID: " + id);
+                    }
                 });
     }
 
