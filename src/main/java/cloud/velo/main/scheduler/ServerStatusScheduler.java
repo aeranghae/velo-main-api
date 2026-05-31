@@ -57,6 +57,7 @@ public class ServerStatusScheduler {
                             .data(status, org.springframework.http.MediaType.APPLICATION_JSON)
             );
 
+            log.info("[스케줄러] 전송 성공 - CPU: {}%, RAM: {} bytes", status.getCpuUsage(), status.getUsedMemory());
         } catch (Exception e) {
             log.error("⚠ 쿠버네티스 메트릭 수집 중 예외 발생: ", e);
         }
