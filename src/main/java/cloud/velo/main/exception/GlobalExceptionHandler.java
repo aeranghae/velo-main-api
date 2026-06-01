@@ -21,7 +21,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body("요청 파라미터가 올바르지 않습니다. 입력 값을 다시 확인해주세요.");
     }
 
-    // [404 Not Found] 사용자를 찾을 수 없을 때 (내가 직접 던진 안전한 예외)
+    // [404 Not Found] 사용자를 찾을 수 없을 때
     @ExceptionHandler(UserNotFoundException.class)
     public ResponseEntity<String> handleUserNotFoundException(UserNotFoundException e) {
         log.warn("[유저 도메인 예외 감지] : {}", e.getMessage());
