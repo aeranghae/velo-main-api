@@ -17,7 +17,7 @@ public class ServerStatusService {
     private final SseEmitterManager sseEmitterManager;
     private static final Long SSE_TIMEOUT = 1800000L; // 30분
 
-    public SseEmitter createStatusStream() throws IOException {
+    public SseEmitter createStatusStream() {
         String id = String.valueOf(System.currentTimeMillis());
 
         // 1. Emitter 생성 및 콜백 선등록
@@ -27,13 +27,19 @@ public class ServerStatusService {
         emitter.onTimeout(() -> sseEmitterManager.remove(id));
         emitter.onError((e) -> sseEmitterManager.remove(id));
 
-        // 2. 더미 이벤트를 전송하여 Nginx 버퍼링 및 503 에러 원천 차단
-        // IOException을 삼키지 않고 상위로 throws하여 연결 실패 시 자원이 꼬이지 않도록 합니다.
-        emitter.send(SseEmitter.event()
-                .name("connect")
-                .data("SSE Connected!"));
+        try {
+            // 2. 더미 이벤트를 전송하여 Nginx 버퍼링 및 503 에러 원천 차단
+            emitter.send(SseEmitter.event()
+                    .name("connect")
+                    .data("SSE Connected!"));
 
-        // 3. 최초 연결이 완벽하게 성공했을 때만 비동기 매니저에 최종 등록
+        } catch (IOException e) {
+            // 3. [핵심] 체크 예외인 IOException이 터지면 런타임 예외로 포장해서 위로 올려보냅니다
+            log.error("[SSE] 최초 연결 더미 이벤트 전송 중 물리적 I/O 에러 발생: {}", e.getMessage(), e);
+            throw new IllegalStateException("실시간 서버 상태 스트림 연결에 실패했습니다.", e);
+        }
+
+        // 4. 최초 연결이 완벽하게 성공했을 때만 비동기 매니저에 최종 등록
         sseEmitterManager.add(id, emitter);
 
         return emitter;
