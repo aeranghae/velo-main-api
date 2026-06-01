@@ -3,6 +3,7 @@ package cloud.velo.main.exception;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -34,5 +35,12 @@ public class GlobalExceptionHandler {
         log.error("서버 심각한 오류 발생! 원인: {}", e.getMessage(), e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body("서버 내부 처리 중 오류가 발생했습니다. 관리자에게 문의하세요.");
+    }
+
+    // 4. [401 Unauthorized] 구글 토큰 인증 실패나 잘못된 자격 증명일 때
+    @ExceptionHandler(BadCredentialsException.class) // 혹은 프로젝트에서 구글 인증 실패 시 던지는 예외 클래스 지정
+    public ResponseEntity<String> handleBadCredentialsException(BadCredentialsException e) {
+        log.warn("인증 실패: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인 실패: " + e.getMessage());
     }
 }

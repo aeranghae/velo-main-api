@@ -12,9 +12,12 @@ import com.google.api.client.json.gson.GsonFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.BadCredentialsException; // 💡 스프링 보안 예외 추가
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.util.Collections;
 
 @RequiredArgsConstructor
@@ -25,25 +28,25 @@ public class GoogleAuthService {
     private final UserRepository userRepository;
     private final AiModelRepository aiModelRepository;
 
-    // application.yml에 있는 구글 클라이언트 ID를 가져옵니다.
     @Value("${spring.security.oauth2.client.registration.google.client-id}")
     private String googleClientId;
 
     @Transactional
-    public User verifyTokenAndLogin(String credential) throws Exception {
-        // 1. 구글 토큰 검증기 생성
+    // 1. 무책임한 throws Exception 대신, 내부 라이브러리가 던지는 실제 예외 종류를 명시합니다.
+    public User verifyTokenAndLogin(String credential) throws GeneralSecurityException, IOException {
+
         GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
                 .setAudience(Collections.singletonList(googleClientId))
                 .build();
 
-        // 2. 토큰이 진짜인지 구글 서버를 통해 확인
         GoogleIdToken idToken = verifier.verify(credential);
 
+        // 2. 구글 토큰이 유효하지 않다면 컨트롤러 어드바이스가 가로챌 수 있도록 BadCredentialsException을 던집니다.
+        // 이 예외는 런타임 예외이므로 터지는 즉시 프록시 객체가 트랜잭션을 알아서 안전하게 Rollback 시킵니다.
         if (idToken == null) {
-            throw new IllegalArgumentException("유효하지 않은 구글 토큰입니다.");
+            throw new BadCredentialsException("구글 로그인 토큰 인증에 실패했습니다.");
         }
 
-        // 3. 진짜라면 토큰 안에서 사용자 정보(페이로드) 꺼내기
         GoogleIdToken.Payload payload = idToken.getPayload();
         String email = payload.getEmail();
         String name = (String) payload.get("name");
@@ -54,23 +57,23 @@ public class GoogleAuthService {
                 .orElse(null);
 
         if (defaultModel == null) {
-            log.warn("⚠️ 현재 DB에 활성화된 AI 모델이 하나도 없습니다. 신규 유저에게 모델이 배정되지 않습니다.");
+            log.warn("현재 DB에 활성화된 AI 모델이 하나도 없습니다. 신규 유저에게 모델이 배정되지 않습니다.");
         }
 
-        // 4. 우리 DB에 있는 회원인지 확인 후, 없으면 자동 회원가입(Save), 있으면 정보 업데이트
         User user = userRepository.findByEmail(email)
-                .map(entity -> entity.update(name, pictureUrl)) // 기존 회원이면 이름/프사 업데이트
+                .map(entity -> entity.update(name, pictureUrl))
                 .orElse(User.builder()
                         .email(email)
                         .name(name)
                         .picture(pictureUrl)
                         .model(defaultModel)
-                        .role(Role.USER) // 혹은 기본 권한 설정
-                        .build()); // 신규 회원이면 객체 생성
+                        .role(Role.USER)
+                        .build());
 
         User saved = userRepository.save(user);
+
         if (saved.getModel() != null) {
-            saved.getModel().getModelName(); // 트랜잭션 안에서 proxy 초기화
+            saved.getModel().getModelName(); // @Transactional 울타리 덕분에 Lazy Loading 프록시가 안전하게 초기화됨!
         }
         return saved;
     }
