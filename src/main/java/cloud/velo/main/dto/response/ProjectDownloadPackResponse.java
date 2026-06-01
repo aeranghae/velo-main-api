@@ -6,7 +6,7 @@ import org.springframework.http.ContentDisposition;
 
 @Getter
 @AllArgsConstructor
-public class ProjectDownloadPack {
+public class ProjectDownloadPackResponse {
     private byte[] zipData;
     private ContentDisposition contentDisposition;
 }

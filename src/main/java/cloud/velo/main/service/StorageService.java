@@ -101,7 +101,7 @@ public class StorageService {
     }
 
     @Transactional(readOnly = true)
-    public ProjectDownloadPack prepareProjectDownload(String email, String uuid) {
+    public ProjectDownloadPackResponse prepareProjectDownload(String email, String uuid) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다. email: " + email));
 
@@ -115,7 +115,7 @@ public class StorageService {
                 .filename(zipName, StandardCharsets.UTF_8)
                 .build();
 
-        return new ProjectDownloadPack(zipData, contentDisposition);
+        return new ProjectDownloadPackResponse(zipData, contentDisposition);
     }
 
     // 이메일 래핑 기반 제어 메서드 계열 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

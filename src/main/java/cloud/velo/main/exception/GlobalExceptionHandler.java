@@ -14,21 +14,21 @@ import java.util.Objects;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // 1. [400 Bad Request] 잘못된 파라미터 유입 (범용 방어벽)
+    // [400 Bad Request] 잘못된 파라미터 유입 (범용 방어벽)
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<String> handleIllegalArgumentException(IllegalArgumentException e) {
         log.warn("[400 Bad Request] 잘못된 인자 유입: {}", e.getMessage());
         return ResponseEntity.badRequest().body("요청 파라미터가 올바르지 않습니다. 입력 값을 다시 확인해주세요.");
     }
 
-    // 2. [404 Not Found] 사용자를 찾을 수 없을 때 (내가 직접 던진 안전한 예외)
+    // [404 Not Found] 사용자를 찾을 수 없을 때 (내가 직접 던진 안전한 예외)
     @ExceptionHandler(UserNotFoundException.class)
     public ResponseEntity<String> handleUserNotFoundException(UserNotFoundException e) {
         log.warn("[유저 도메인 예외 감지] : {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
     }
 
-    // 3. [400 Bad Request] @Valid 유효성 검사 실패 시
+    // [400 Bad Request] @Valid 유효성 검사 실패 시
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<String> handleValidationException(MethodArgumentNotValidException e) {
         String errorMessage = Objects.requireNonNull(e.getBindingResult().getFieldError()).getDefaultMessage();
@@ -38,7 +38,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(errorMessage);
     }
 
-    // 4. [401 Unauthorized] 구글 토큰 인증 실패나 잘못된 자격 증명일 때
+    // [401 Unauthorized] 구글 토큰 인증 실패나 잘못된 자격 증명일 때
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<String> handleBadCredentialsException(BadCredentialsException e) {
         log.warn("인증 실패: {}", e.getMessage());
@@ -46,7 +46,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
     }
 
-    // 5. [403 Forbidden] 권한이 없는 기능에 접근했을 때
+    // [403 Forbidden] 권한이 없는 기능에 접근했을 때
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<String> handleAccessDeniedException(AccessDeniedException e) {
         log.warn("권한 거부 접근 발생: {}", e.getMessage());
@@ -55,7 +55,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
     }
 
-    // 6. [429 Too Many Requests] 처리율 제한 트래픽 초과 시
+    // [429 Too Many Requests] 처리율 제한 트래픽 초과 시
     @ExceptionHandler(OverRateLimitException.class)
     public ResponseEntity<String> handleOverRateLimitException(OverRateLimitException e) {
         log.warn("트래픽 제한 초과 발생: {}", e.getMessage());
@@ -63,7 +63,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(e.getMessage());
     }
 
-    // 7. [500 Internal Server Error] 인프라 합선 및 시스템 상태 오류 (SSE, I/O 등)
+    // [500 Internal Server Error] 인프라 합선 및 시스템 상태 오류 (SSE, I/O 등)
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<String> handleIllegalStateException(IllegalStateException e) {
         log.error("[시스템 상태 오류 감지] : {}", e.getMessage(), e);
@@ -72,7 +72,7 @@ public class GlobalExceptionHandler {
                 .body("서버 실시간 연동 중 일시적인 장애가 발생했습니다. 잠시 후 다시 시도해 주세요.");
     }
 
-    // 8. [500 Internal Server Error] 예측하지 못한 최상위 치명적 서버 에러
+    // [500 Internal Server Error] 예측하지 못한 최상위 치명적 서버 에러
     @ExceptionHandler(Exception.class)
     public ResponseEntity<String> handleAllException(Exception e) {
         log.error("서버 심각한 오류 발생! 원인: {}", e.getMessage(), e);

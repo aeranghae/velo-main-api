@@ -144,14 +144,14 @@ public class StorageApiController {
     @GetMapping("/{uuid}/download")
     public ResponseEntity<byte[]> downloadProject(@AuthenticationPrincipal String email,
                                                   @PathVariable String uuid) {
-        // 💡 헤더 조립용 가공 메타데이터와 압축 데이터 자체를 서비스로부터 안전하게 한번에 수령합니다.
-        ProjectDownloadPack downloadPack = storageService.prepareProjectDownload(email, uuid);
+        // 헤더 조립용 가공 메타데이터와 압축 데이터 자체를 서비스로부터 안전하게 한번에 수령합니다.
+        ProjectDownloadPackResponse downloadPackResponse = storageService.prepareProjectDownload(email, uuid);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType("application/zip"));
-        headers.setContentLength(downloadPack.getZipData().length);
-        headers.setContentDisposition(downloadPack.getContentDisposition());
+        headers.setContentLength(downloadPackResponse.getZipData().length);
+        headers.setContentDisposition(downloadPackResponse.getContentDisposition());
 
-        return new ResponseEntity<>(downloadPack.getZipData(), headers, HttpStatus.OK);
+        return new ResponseEntity<>(downloadPackResponse.getZipData(), headers, HttpStatus.OK);
     }
 }
