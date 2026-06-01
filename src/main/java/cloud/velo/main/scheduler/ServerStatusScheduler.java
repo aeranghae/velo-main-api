@@ -5,41 +5,30 @@ import cloud.velo.main.dto.response.ServerStatusResponse;
 import cloud.velo.main.service.ServerStatusService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class ServerStatusScheduler {
 
-    private final SseEmitterManager sseEmitterManager;
     private final ServerStatusService serverStatusService;
+    private final SseEmitterManager sseEmitterManager;
 
+    /**
+     * 5초마다 주기적으로 전체 커넥션 세션에 서버 메트릭 상태를 실시간 송출합니다.
+     */
     @Scheduled(fixedRate = 5000)
     public void broadcastServerStatus() {
-        // 방송 수신기가 없으면 연산조차 하지 않고 즉시 리턴 (자원 최적화)
-        if (sseEmitterManager.isEmpty()) {
-            return;
-        }
-
         try {
-            // 1. 복잡한 JVM 메트릭 수집 및 가공은 서비스에 위임
             ServerStatusResponse status = serverStatusService.calculateCurrentStatus();
 
-            // 2. 매니저를 통해 안전하게 전체 브로드캐스팅 수행
-            sseEmitterManager.broadcast(
-                    SseEmitter.event()
-                            .name("server-status")
-                            .data(status, MediaType.APPLICATION_JSON)
-            );
+            sseEmitterManager.broadcast(status);
 
         } catch (Exception e) {
-            // 스케줄러의 예외는 웹 어드바이스가 잡지 못하므로 시스템 로깅 인프라에 명확히 기록하거나
-            // 모니터링 컴포넌트를 호출하여 슬랙 등으로 유도해야 합니다.
-            log.error("[스케줄러 메트릭 수집 장애] 백엔드 시스템 메트릭 수집 중 예외 발생: ", e);
+            // 스케줄러 루프 스레드가 터져서 시스템 전체가 죽는 합선을 방지하는 최종 격리 가드
+            log.error("[ServerStatusScheduler] 실시간 서버 메트릭 크롤링 및 브로드캐스팅 공정 중 예외 터짐", e);
         }
     }
 }
