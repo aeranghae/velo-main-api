@@ -87,4 +87,11 @@ public class GlobalExceptionHandler {
         log.warn("[저장소 도메인 예외 감지] : {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
     }
+
+    // [400 Bad Request] 생성 가능한 최대 프로젝트 개수를 초과했을 때 격발
+    @ExceptionHandler(MaxProjectLimitException.class)
+    public ResponseEntity<String> handleMaxProjectLimitException(MaxProjectLimitException e) {
+        log.warn("⚠️ 프로젝트 생성 제한 도달: {}", e.getMessage());
+        return ResponseEntity.badRequest().body(e.getMessage());
+    }
 }
