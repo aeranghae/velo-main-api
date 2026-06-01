@@ -6,12 +6,16 @@ import cloud.velo.main.domain.AiModel;
 import cloud.velo.main.domain.User;
 import cloud.velo.main.repository.AiModelRepository;
 import cloud.velo.main.repository.UserRepository;
+import cloud.velo.main.util.bucket.RateLimiter;
+import cloud.velo.main.exception.OverRateLimitException;
+import io.github.bucket4j.Bucket;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
@@ -27,9 +31,9 @@ import java.util.stream.Collectors;
 public class AiModelService {
 
     private final RestClient restClient = RestClient.create();
-
     private final AiModelRepository aiModelRepository;
     private final UserRepository userRepository;
+    private final RateLimiter rateLimiter;
 
     @Value("${llm.server.url}")
     private String serverUrl;
@@ -38,57 +42,77 @@ public class AiModelService {
     @Transactional(readOnly = true)
     public List<AiModelNameResponse> getActiveModelNames() {
         return aiModelRepository.findAllByIsActiveTrue().stream()
-                .map(model -> new AiModelNameResponse(
-                        model.getModelName(),
-                        model.getProvider()
-                ))
+                .map(model -> new AiModelNameResponse(model.getModelName(), model.getProvider()))
                 .collect(Collectors.toList());
+    }
+
+    // 컨트롤러 리팩토링에 대응하는 유저 체킹 조회 메서드 추가
+    @Cacheable(value = "aiModelList")
+    @Transactional(readOnly = true)
+    public List<AiModelNameResponse> getActiveModelNamesWithUserCheck(String email) {
+        userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+        return getActiveModelNames();
     }
 
     @CacheEvict(value = "aiModelList", allEntries = true)
     @Transactional
     public void setDefaultModel(Long modelId) {
-        // 1. 기존에 기본값으로 설정된 모델들을 모두 false로 변경
         aiModelRepository.findAllByDefaultActiveTrue()
                 .forEach(AiModel::releaseDefault);
 
-        // 2. 새로운 모델을 기본값으로 설정
         AiModel newDefault = aiModelRepository.findById(modelId)
                 .orElseThrow(() -> new IllegalArgumentException("모델을 찾을 수 없습니다."));
 
         newDefault.setAsDefault();
     }
 
+    // 컨트롤러에서 위임받은 이름 기반의 기본 모델 변경 통합 메서드
     @CacheEvict(value = "userCache", key = "#email")
     @Transactional
-    public void updateDefaultModel(String email, String modelName) {
-        // 1. 해당 모델이 존재하는지, 그리고 활성화 상태인지 확인
+    public void modifyDefaultModel(String email, String modelName) {
+        if (modelName == null || modelName.isEmpty()) {
+            throw new IllegalArgumentException("모델 이름이 필요합니다.");
+        }
+
         AiModel aiModel = aiModelRepository.findByModelNameAndIsActiveTrue(modelName)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않거나 비활성화된 모델입니다."));
 
-        // 2. 유저 조회
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
-        // 3. 유저의 기본 모델 변경 (영속성 컨텍스트 덕분에 자동 update)
         user.updateModel(aiModel);
     }
 
-    // 요구사항 분석을 위한 파일
+    // 컨트롤러에서 트래픽 제어권을 넘겨받아 통합한 Rate Limit 결합 메서드
+    @Transactional
+    public ProjectArchitectureResponse analyzeProjectIdeaWithRateLimit(String email, String idea) {
+        Bucket bucket = rateLimiter.resolveBucket(email);
+
+        if (!bucket.tryConsume(1)) {
+            // 토큰 부족 시 언체크 예외를 유발하여 디스패처 서블릿 -> 전역 어드바이스(429)로 분수 유도
+            throw new OverRateLimitException("분당 요청 횟수가 초과되었습니다. 잠시 후 다시 시도해주세요.");
+        }
+
+        // 토큰 소비 통과 시 진짜 AI 분석 핵심 로직 가동
+        return analyzeProjectIdea(email, idea);
+    }
+
+    // 영속성 1차 캐시 보호 및 조회를 위해 readOnly 트랜잭션 울타리 추가!
+    @Transactional(readOnly = true)
     public ProjectArchitectureResponse analyzeProjectIdea(String email, String userIdea) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
-
-        // TODO: 일단 관리자 두명만 허가
+        // 널을 주는 모순을 깨부수고 권한 거부 예외(403)를 명확하게 뿜어내게 변경!
         if (user.getId() != 1 && user.getId() != 2) {
-            return null;
+            throw new AccessDeniedException("AI 아키텍처 분석 권한이 없는 계정입니다.");
         }
 
         String fastApiUrl = serverUrl + "/api/llm/architecture";
         Map<String, String> requestBody = Map.of("description", userIdea);
 
-        int maxRetries = 3; // 재시도 허용 횟수
+        int maxRetries = 3;
         int attempt = 0;
 
         while (attempt < maxRetries) {
@@ -103,31 +127,25 @@ public class AiModelService {
                         .retrieve()
                         .body(ProjectArchitectureResponse.class);
 
-                //  [검증 가드] HTTP 통신은 성공했으나 본문 내용(DTO)이 null이거나 필수 핵심 필드가 깨져서 유입된 경우
                 if (response == null || response.getSubject() == null || response.getSubject().isBlank()) {
-                    log.warn("[Architecture-Api] 올바르지 않은 데이터 형식 유입. 재요청을 진행합니다. (시도 {}/{})", attempt, maxRetries);
-                    continue; // 아래 코드를 건너뛰고 다음 attempt 루프로 이동
+                    log.warn("[Architecture-Api] 올바르지 않은 데이터 형식 유입. 재요청 진행 (시도 {}/{})", attempt, maxRetries);
+                    continue;
                 }
 
-                // 올바른 데이터가 정상 수신되었다면 즉시 결과 리턴 후 탈출
                 log.info("[Architecture-Api] 완벽한 아키텍처 기획 스냅샷 수신 성공! (주제: {})", response.getSubject());
                 return response;
 
             } catch (RestClientException e) {
-                // FastAPI 단에서 Pydantic 제약조건 유효성 위반으로 500 이나 400 에러를 뱉었을 때 낚아챕니다.
-                log.error("[Architecture-Api] FastAPI 엔진 응답 실패 또는 규칙 위반 예외 발생 (시도 {}/{}): {}", attempt, maxRetries, e.getMessage());
+                log.error("[Architecture-Api] FastAPI 엔진 응답 실패 (시도 {}/{}): {}", attempt, maxRetries, e.getMessage());
 
                 if (attempt >= maxRetries) {
-                    // 3번 다 튕겼을 때 최종적으로 멱살 잡고 런타임 에러 격발
-                    throw new IllegalStateException("AI 기획 엔진이 지속적으로 올바르지 않은 양식을 응답했습니다. 잠시 후 다시 시도해주세요.", e);
+                    throw new IllegalStateException("AI 기획 엔진이 지속적으로 올바르지 않은 양식을 응답했습니다.", e);
                 }
 
-                // 다음 턴 격발 전 안트로픽/구글 서버 버퍼 리셋을 위해 1.5초간 가볍게 숨 고르기 대기
                 try { Thread.sleep(1500); } catch (InterruptedException ignored) {}
             }
         }
 
         throw new IllegalStateException("요구사항 분석 공정이 올바르게 마감되지 않았습니다.");
     }
-
 }
