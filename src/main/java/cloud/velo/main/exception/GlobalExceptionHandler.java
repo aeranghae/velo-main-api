@@ -43,4 +43,15 @@ public class GlobalExceptionHandler {
         log.warn("인증 실패: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인 실패: " + e.getMessage());
     }
+
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<String> handleIllegalStateException(IllegalStateException e) {
+        // 서버 전체에서 발생하는 모든 상태 오류(SSE 포함)를 여기서 일괄 로깅 및 모니터링 처리!
+        log.error("🔥 [시스템 상태 오류 감지] : {}", e.getMessage(), e);
+
+        // 필요 시 여기에 슬랙 알림 발송 로직 추가 가능!
+
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+    }
 }

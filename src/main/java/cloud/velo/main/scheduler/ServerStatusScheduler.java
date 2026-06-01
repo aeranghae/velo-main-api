@@ -2,12 +2,13 @@ package cloud.velo.main.scheduler;
 
 import cloud.velo.main.client.SseEmitterManager;
 import cloud.velo.main.dto.response.ServerStatusResponse;
+import cloud.velo.main.service.ServerStatusService; // 💡 서비스 의존성 추가
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import java.lang.management.ManagementFactory;
 
 @Slf4j
 @Component
@@ -15,51 +16,30 @@ import java.lang.management.ManagementFactory;
 public class ServerStatusScheduler {
 
     private final SseEmitterManager sseEmitterManager;
+    private final ServerStatusService serverStatusService;
 
     @Scheduled(fixedRate = 5000)
     public void broadcastServerStatus() {
-        if (sseEmitterManager.isEmpty()) return;
+        // 방송 수신기가 없으면 연산조차 하지 않고 즉시 리턴 (자원 최적화)
+        if (sseEmitterManager.isEmpty()) {
+            return;
+        }
 
         try {
-            // 1. 쿠버네티스 환경에서도 안전한 JVM 런타임 메모리 계산
-            long maxMemory = Runtime.getRuntime().maxMemory(); // 컨테이너 제한이 적용된 최대 메모리
-            long totalMemory = Runtime.getRuntime().totalMemory(); // 현재 JVM이 차지한 메모리
-            long freeMemory = Runtime.getRuntime().freeMemory(); // 차지한 메모리 중 남은 메모리
+            // 1. 복잡한 JVM 메트릭 수집 및 가공은 서비스에 위임
+            ServerStatusResponse status = serverStatusService.calculateCurrentStatus();
 
-            // 실제 앱이 사용 중인 순수 메모리 가용량 계산
-            long usedMemory = totalMemory - freeMemory;
-
-            // 2. 호스트 OS 비종속적인 안전한 CPU Load 계산
-            // (Com.sun.management 대신 가상 스레드/프로세스 수치 활용 혹은 고정값 방어)
-            double cpuUsage = ManagementFactory.getOperatingSystemMXBean().getSystemLoadAverage();
-            if (cpuUsage < 0) {
-                cpuUsage = 0.0; // 윈도우 환경 등에서 음수 반환 방어
-            } else {
-                // 단일 컨테이너 내부의 대략적인 코어 사용률로 보정
-                cpuUsage = Math.min(100.0, cpuUsage * 100.0);
-            }
-
-            // 가동 시간 (Uptime)
-            long uptime = ManagementFactory.getRuntimeMXBean().getUptime();
-
-            ServerStatusResponse status = ServerStatusResponse.builder()
-                    .status("UP")
-                    .uptime(uptime)
-                    .cpuUsage(Math.round(cpuUsage * 100.0) / 100.0)
-                    .totalMemory(maxMemory) // 호스트 메모리 대신 컨테이너 최대 메모리를 분모로 설정
-                    .freeMemory(maxMemory - usedMemory)
-                    .usedMemory(usedMemory)
-                    .build();
-
+            // 2. 매니저를 통해 안전하게 전체 브로드캐스팅 수행
             sseEmitterManager.broadcast(
                     SseEmitter.event()
                             .name("server-status")
-                            .data(status, org.springframework.http.MediaType.APPLICATION_JSON)
+                            .data(status, MediaType.APPLICATION_JSON)
             );
 
-            // log.info("[스케줄러] 전송 성공 - CPU: {}%, RAM: {} bytes", status.getCpuUsage(), status.getUsedMemory());
         } catch (Exception e) {
-            log.error("⚠ 쿠버네티스 메트릭 수집 중 예외 발생: ", e);
+            // 스케줄러의 예외는 웹 어드바이스가 잡지 못하므로 시스템 로깅 인프라에 명확히 기록하거나
+            // 모니터링 컴포넌트를 호출하여 슬랙 등으로 유도해야 합니다.
+            log.error("[스케줄러 메트릭 수집 장애] 백엔드 시스템 메트릭 수집 중 예외 발생: ", e);
         }
     }
 }

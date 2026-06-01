@@ -1,11 +1,13 @@
 package cloud.velo.main.service;
 
 import cloud.velo.main.client.SseEmitterManager;
+import cloud.velo.main.dto.response.ServerStatusResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -35,5 +37,32 @@ public class ServerStatusService {
         sseEmitterManager.add(id, emitter);
 
         return emitter;
+    }
+
+    public ServerStatusResponse calculateCurrentStatus() {
+        // 1. JVM 컨테이너 가용 메모리 계산
+        long maxMemory = Runtime.getRuntime().maxMemory();
+        long totalMemory = Runtime.getRuntime().totalMemory();
+        long freeMemory = Runtime.getRuntime().freeMemory();
+        long usedMemory = totalMemory - freeMemory;
+
+        // 2. 호스트 비종속적 CPU Load 계산 및 보정
+        double cpuUsage = ManagementFactory.getOperatingSystemMXBean().getSystemLoadAverage();
+        if (cpuUsage < 0) {
+            cpuUsage = 0.0;
+        } else {
+            cpuUsage = Math.min(100.0, cpuUsage * 100.0);
+        }
+
+        long uptime = ManagementFactory.getRuntimeMXBean().getUptime();
+
+        return ServerStatusResponse.builder()
+                .status("UP")
+                .uptime(uptime)
+                .cpuUsage(Math.round(cpuUsage * 100.0) / 100.0)
+                .totalMemory(maxMemory)
+                .freeMemory(maxMemory - usedMemory)
+                .usedMemory(usedMemory)
+                .build();
     }
 }

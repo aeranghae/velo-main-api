@@ -4,59 +4,56 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
 public class SseEmitterManager {
 
+    // 동시성 멀티스레드 환경을 위한 안전한 맵 구조 유지
     private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
 
     public void add(String id, SseEmitter emitter) {
-        // 혹시 모를 이전 찌꺼기 세션 청소
-        if (!emitters.isEmpty()) {
-            emitters.clear();
+        try {
+            emitters.put(id, emitter);
+            log.info("[SSE] 유효한 SSE 세션 등록 성공! ID: {}", id);
+        } catch (Exception e) {
+            log.error("[SSE] 세션 등록 중 알 수 없는 에러 발생 ID: {}", id, e);
         }
-
-        CompletableFuture.delayedExecutor(500, TimeUnit.MILLISECONDS)
-                .execute(() -> {
-                    try {
-                        // 0.5초 사이에 클라이언트가 나가서 이미 끝난 세션인지 검사
-                        emitter.send(SseEmitter.event().comment("ping"));
-                        emitters.put(id, emitter);
-                        log.info("[스프링] 유효한 SSE 세션 등록 성공! ID: " + id);
-                    } catch (Exception e) {
-                        log.info("[스프링] 등록 전 이미 종료된 세션이라 폐기합니다. ID: " + id);
-                    }
-                });
     }
 
     public void remove(String id) {
-        emitters.remove(id);
+        SseEmitter removed = emitters.remove(id);
+        if (removed != null) {
+            log.info("[SSE] 세션이 정상적으로 제거되었습니다. ID: {}", id);
+        }
     }
 
     public boolean isEmpty() {
         return emitters.isEmpty();
     }
 
+    /**
+     * 전체 클라이언트에게 실시간 상태 방송
+     */
     public void broadcast(SseEmitter.SseEventBuilder event) {
-        List<String> deadEmitters = new ArrayList<>();
+        if (emitters.isEmpty()) {
+            return;
+        }
 
-        emitters.forEach((id, emitter) -> {
+        emitters.entrySet().removeIf(entry -> {
             try {
-                emitter.send(event);
+                entry.getValue().send(event);
+                return false;
+            } catch (IOException e) {
+                // 네트워크 단절은 예상된 '정상 탈락'이므로 true를 반환해 맵에서 지웁니다.
+                return true;
             } catch (Exception e) {
-                deadEmitters.add(id);
+                // 네트워크 단절이 아닌 시스템 합선 등 '치명적 에러'는 삼키지 않고 언체크 예외로 감싸 던집니다!
+                throw new IllegalStateException("[SSE] 브로드캐스팅 중 예측하지 못한 치명적 오류 발생", e);
             }
         });
-
-        if (!deadEmitters.isEmpty()) {
-            deadEmitters.forEach(emitters::remove);
-        }
     }
 }
