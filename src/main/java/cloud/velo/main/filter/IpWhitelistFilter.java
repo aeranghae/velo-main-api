@@ -4,7 +4,6 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,10 +18,9 @@ import java.util.List;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class IpWhitelistFilter extends OncePerRequestFilter {
 
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper securityObjectMapper = new ObjectMapper();
 
     @Value("${llm.server.allowed-ips}")
     private List<String> allowedIps;
@@ -52,7 +50,7 @@ public class IpWhitelistFilter extends OncePerRequestFilter {
                 response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                 response.setCharacterEncoding(StandardCharsets.UTF_8.name());
 
-                String jsonResponse = objectMapper.writeValueAsString(
+                String jsonResponse = securityObjectMapper.writeValueAsString(
                         "허용되지 않은 파일 접근입니다. 격리 구역 외부의 자원은 조작할 수 없습니다."
                 );
                 response.getWriter().write(jsonResponse);

@@ -31,6 +31,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
+
     private final ObjectMapper objectMapper;
 
     @Value("${app.cors.allowed-origins}")
@@ -38,11 +39,6 @@ public class SecurityConfig {
 
     @Value("${llm.server.allowed-paths}")
     private List<String> llmAllowedPaths;
-
-    @Bean
-    public ObjectMapper objectMapper() {
-        return new ObjectMapper();
-    }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) {
