@@ -16,7 +16,7 @@ public class ServerStatusController {
     private final ServerStatusService serverStatusService;
 
     @GetMapping(value = "/api/server/status/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamServerStatus(HttpServletResponse response) throws IOException {
+    public SseEmitter streamServerStatus(HttpServletResponse response) {
 
         // HTTP 응답 스트림이 인프라 레이어(Nginx 등)에서 버퍼링되지 않도록 규격 헤더 설정 (Web 영역의 책임)
         response.setHeader("X-Accel-Buffering", "no");

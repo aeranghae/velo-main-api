@@ -8,6 +8,8 @@ import cloud.velo.main.repository.AiModelRepository;
 import cloud.velo.main.repository.UserRepository;
 import cloud.velo.main.util.bucket.RateLimiter;
 import cloud.velo.main.exception.OverRateLimitException;
+import cloud.velo.main.exception.UserNotFoundException;  // 💡 추가
+import cloud.velo.main.exception.ModelNotFoundException; // 💡 추가
 import io.github.bucket4j.Bucket;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,12 +48,12 @@ public class AiModelService {
                 .collect(Collectors.toList());
     }
 
-    // 컨트롤러 리팩토링에 대응하는 유저 체킹 조회 메서드 추가
     @Cacheable(value = "aiModelList")
     @Transactional(readOnly = true)
     public List<AiModelNameResponse> getActiveModelNamesWithUserCheck(String email) {
+
         userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다. email: " + email));
         return getActiveModelNames();
     }
 
@@ -62,12 +64,11 @@ public class AiModelService {
                 .forEach(AiModel::releaseDefault);
 
         AiModel newDefault = aiModelRepository.findById(modelId)
-                .orElseThrow(() -> new IllegalArgumentException("모델을 찾을 수 없습니다."));
+                .orElseThrow(() -> new ModelNotFoundException("지정하려는 모델을 찾을 수 없습니다. ID: " + modelId));
 
         newDefault.setAsDefault();
     }
 
-    // 컨트롤러에서 위임받은 이름 기반의 기본 모델 변경 통합 메서드
     @CacheEvict(value = "userCache", key = "#email")
     @Transactional
     public void modifyDefaultModel(String email, String modelName) {
@@ -76,35 +77,31 @@ public class AiModelService {
         }
 
         AiModel aiModel = aiModelRepository.findByModelNameAndIsActiveTrue(modelName)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않거나 비활성화된 모델입니다."));
+                .orElseThrow(() -> new ModelNotFoundException("존재하지 않거나 현재 비활성화된 AI 모델입니다. model: " + modelName));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다. email: " + email));
 
         user.updateModel(aiModel);
     }
 
-    // 컨트롤러에서 트래픽 제어권을 넘겨받아 통합한 Rate Limit 결합 메서드
     @Transactional
     public ProjectArchitectureResponse analyzeProjectIdeaWithRateLimit(String email, String idea) {
         Bucket bucket = rateLimiter.resolveBucket(email);
 
         if (!bucket.tryConsume(1)) {
-            // 토큰 부족 시 언체크 예외를 유발하여 디스패처 서블릿 -> 전역 어드바이스(429)로 분수 유도
             throw new OverRateLimitException("분당 요청 횟수가 초과되었습니다. 잠시 후 다시 시도해주세요.");
         }
 
-        // 토큰 소비 통과 시 진짜 AI 분석 핵심 로직 가동
         return analyzeProjectIdea(email, idea);
     }
 
-    // 영속성 1차 캐시 보호 및 조회를 위해 readOnly 트랜잭션 울타리 추가!
     @Transactional(readOnly = true)
     public ProjectArchitectureResponse analyzeProjectIdea(String email, String userIdea) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
-        // 널을 주는 모순을 깨부수고 권한 거부 예외(403)를 명확하게 뿜어내게 변경!
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다. email: " + email));
+
         if (user.getId() != 1 && user.getId() != 2) {
             throw new AccessDeniedException("AI 아키텍처 분석 권한이 없는 계정입니다.");
         }

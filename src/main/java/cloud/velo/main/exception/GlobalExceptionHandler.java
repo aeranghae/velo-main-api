@@ -80,4 +80,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body("서버 내부 처리 중 에러가 발생했습니다. 지속될 경우 관리자에게 문의하세요.");
     }
+
+    // [404 Not Found] 저장소 도메인에서 프로젝트 데이터를 찾을 수 없을 때
+    @ExceptionHandler(ProjectNotFoundException.class)
+    public ResponseEntity<String> handleProjectNotFoundException(ProjectNotFoundException e) {
+        log.warn("[저장소 도메인 예외 감지] : {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+    }
 }
