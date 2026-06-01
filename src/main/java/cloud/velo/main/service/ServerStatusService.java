@@ -20,27 +20,27 @@ public class ServerStatusService {
     public SseEmitter createStatusStream() {
         String id = String.valueOf(System.currentTimeMillis());
 
-        // 1. Emitter 생성 및 콜백 선등록
+        // Emitter 순수 생성
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
 
-        emitter.onCompletion(() -> sseEmitterManager.remove(id));
-        emitter.onTimeout(() -> sseEmitterManager.remove(id));
-        emitter.onError((e) -> sseEmitterManager.remove(id));
+        // 비동기 매니저에 먼저 등록합니다.
+        // 이제 onCompletion, onTimeout, onError 같은 생명주기 콜백은
+        // sseEmitterManager.add() 안에서 가드
+        sseEmitterManager.add(id, emitter);
 
         try {
-            // 2. 더미 이벤트를 전송하여 Nginx 버퍼링 및 503 에러 원천 차단
+            // 3. 더미 이벤트를 전송하여 Nginx 버퍼링 및 503 에러 원천 차단
             emitter.send(SseEmitter.event()
                     .name("connect")
                     .data("SSE Connected!"));
 
-        } catch (IOException e) {
-            // 3. [핵심] 체크 예외인 IOException이 터지면 런타임 예외로 포장해서 위로 올려보냅니다
-            log.error("[SSE] 최초 연결 더미 이벤트 전송 중 물리적 I/O 에러 발생: {}", e.getMessage(), e);
+            log.info("[SSE] 실시간 서버 메트릭 관문 개통 성공. ID: {}", id);
+
+        } catch (IOException | IllegalStateException e) {
+            // 4. [보안 가드] 최초 연결 송출 중 브라우저가 깨지거나 I/O 에러 발생 시 포장 격발
+            log.error("[SSE] 최초 연결 더미 이벤트 전송 중 물리적 I/O 에러 발생: {}", e.getMessage());
             throw new IllegalStateException("실시간 서버 상태 스트림 연결에 실패했습니다.", e);
         }
-
-        // 4. 최초 연결이 완벽하게 성공했을 때만 비동기 매니저에 최종 등록
-        sseEmitterManager.add(id, emitter);
 
         return emitter;
     }
