@@ -2,29 +2,36 @@ package cloud.velo.main.config;
 
 import cloud.velo.main.filter.JwtAuthenticationFilter;
 import cloud.velo.main.security.JwtTokenProvider;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+@Slf4j
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final ObjectMapper objectMapper;
 
     @Value("${app.cors.allowed-origins}")
     private List<String> allowedOrigins;
@@ -33,8 +40,15 @@ public class SecurityConfig {
     private List<String> llmAllowedPaths;
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public ObjectMapper objectMapper() {
+        return new ObjectMapper();
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) {
         http
+                // 1. 스프링 시큐리티 자체 CORS 활성화 가드를 명시하여
+                // 시큐리티 필터 체인 최상단에 CorsFilter가 자동으로 예쁘게 배치되도록 유도합니다.
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
@@ -42,30 +56,39 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
-                // 🌟 [추가] 인증 실패 시 예외 처리 핸들러 장착
-                // 토큰이 없는 익명 사용자가 인증 필요한 API에 접근하면 컨트롤러 진입을 '원천 차단'하고 401을 반환합니다.
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) -> {
-                            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "인증 자격 증명이 유효하지 않거나 누락되었습니다.");
+                            log.warn("[Security] 인증 실패 보호 작동 - URI: {}, Reason: {}", request.getRequestURI(), authException.getMessage());
+
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                            response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+
+                            String jsonResponse = objectMapper.writeValueAsString(
+                                    "로그인 실패: 인증 자격 증명이 유효하지 않거나 누락되었습니다."
+                            );
+                            response.getWriter().write(jsonResponse);
                         })
                 )
                 .authorizeHttpRequests(auth -> {
+                    // 브라우저가 날리는 모든 'OPTIONS' 임시 사전 요청(Preflight)은
+                    // 토큰 검사를 하지 않고 패스(permitAll) 시킴
+                    auth.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
+
                     auth.dispatcherTypeMatchers(
                             jakarta.servlet.DispatcherType.ASYNC,
                             jakarta.servlet.DispatcherType.ERROR
                     ).permitAll();
 
-                    auth.requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll();
                     auth.requestMatchers("/api/auth/google").permitAll();
 
-                    // LLM 서버 경로 permitAll (IP 검증은 IpWhitelistFilter가 담당)
                     llmAllowedPaths.forEach(path ->
                             auth.requestMatchers(path + "/**").permitAll()
                     );
 
                     auth.anyRequest().authenticated();
                 })
-                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), CorsFilter.class);
+                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider, objectMapper), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -73,9 +96,11 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("*"));
+
+        config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
         config.setExposedHeaders(List.of("Authorization", "Content-Disposition", "Content-Length"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
