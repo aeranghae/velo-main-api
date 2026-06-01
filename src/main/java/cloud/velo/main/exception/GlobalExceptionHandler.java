@@ -94,4 +94,11 @@ public class GlobalExceptionHandler {
         log.warn("⚠️ 프로젝트 생성 제한 도달: {}", e.getMessage());
         return ResponseEntity.badRequest().body(e.getMessage());
     }
+
+    // [400 Bad Request] 프로젝트가 현재 AI 생성 공정 중(웹소켓 활성 상태)이라 명령을 수행할 수 없을 때
+    @ExceptionHandler(ProjectActiveSessionException.class)
+    public ResponseEntity<String> handleProjectActiveSessionException(ProjectActiveSessionException e) {
+        log.warn("⏳ [세션 제어 정책 위반] 활성 프로젝트 조작 거부: {}", e.getMessage());
+        return ResponseEntity.badRequest().body(e.getMessage());
+    }
 }
