@@ -101,4 +101,13 @@ public class GlobalExceptionHandler {
         log.warn("⏳ [세션 제어 정책 위반] 활성 프로젝트 조작 거부: {}", e.getMessage());
         return ResponseEntity.badRequest().body(e.getMessage());
     }
+
+    // SSE 실시간 스트리밍 중 끊김 현상 으로 인한 예외
+    @org.springframework.web.bind.annotation.ExceptionHandler({
+            org.apache.catalina.connector.ClientAbortException.class,
+            org.springframework.web.context.request.async.AsyncRequestNotUsableException.class
+    })
+    public void handleBrokenPipe(Exception e) {
+        log.info("[Network-Notice] 스트리밍 전송 중 클라이언트가 연결을 해제했습니다. (Broken Pipe)");
+    }
 }
