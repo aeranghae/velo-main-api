@@ -16,10 +16,17 @@ import java.util.Objects;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // 1. [404 Not Found] 사용자를 찾을 수 없거나 데이터가 없을 때
+    // IllegalArgumentException은 다른 도메인(예: 잘못된 파라미터 유입 등)을 위한 400 Bad Request나 500용 범용 방어벽으로 양보합니다.
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<String> handleIllegalArgumentException(IllegalArgumentException e) {
-        log.warn("비즈니스 로직 경고: {}", e.getMessage());
+        log.warn("❌ 잘못된 인자 유입 경고: {}", e.getMessage());
+        return ResponseEntity.badRequest().body("잘못된 요청 양식입니다: " + e.getMessage());
+    }
+
+    // [404 Not Found] 유저 도메인에서 사용자를 찾을 수 없을 때 (최우선 순위 저격)
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<String> handleUserNotFoundException(UserNotFoundException e) {
+        log.warn("👤 [유저 도메인 예외 감지] : {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
     }
 
