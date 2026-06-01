@@ -5,12 +5,14 @@ import cloud.velo.main.dto.request.ProjectLogSaveRequest;
 import cloud.velo.main.domain.Project;
 import cloud.velo.main.domain.ProjectStatus;
 import cloud.velo.main.domain.User;
+import cloud.velo.main.exception.UserNotFoundException;
+import cloud.velo.main.exception.ProjectNotFoundException;
 import cloud.velo.main.repository.ProjectRepository;
 import cloud.velo.main.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.aspectj.lang.annotation.Aspect;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -31,11 +33,9 @@ public class ProjectLogService {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
 
-    // UUID 대신 "userId:projectId" 조합을 Key로 사용
     private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
     private final StringRedisTemplate redisTemplate;
 
-    // 시간 포멧터
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
     private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
@@ -44,15 +44,16 @@ public class ProjectLogService {
      */
     @Transactional(readOnly = true)
     public ProjectLogResponse getProjectMetadataAndLogs(String uuid, String loginEmail) {
-
+        // 자바 공용 예외 -> 커스텀 예외로 전면 리팩토링
         User currentUser = userRepository.findByEmail(loginEmail)
-                .orElseThrow(() -> new IllegalArgumentException("인증 장부에 등록되지 않은 유저입니다: " + loginEmail));
+                .orElseThrow(() -> new UserNotFoundException("인증 장부에 등록되지 않은 유저입니다. email: " + loginEmail));
 
         Project project = projectRepository.findByUuid(uuid)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 프로젝트입니다. UUID: " + uuid));
+                .orElseThrow(() -> new ProjectNotFoundException("존재하지 않는 프로젝트입니다. UUID: " + uuid));
 
+        // SecurityException 대신 관제탑이 403 Forbidden 상자로 처리할 수 있게 시큐리티 표준 예외 유발
         if (!project.getUser().getId().equals(currentUser.getId())) {
-            throw new SecurityException("해당 프로젝트의 로그를 조회할 정식 권한이 없습니다.");
+            throw new AccessDeniedException("해당 프로젝트의 로그를 조회할 정식 권한이 없습니다. UUID: " + uuid);
         }
 
         StringBuilder logBuilder = new StringBuilder();
@@ -68,7 +69,7 @@ public class ProjectLogService {
             }
         }
 
-        // 2. Redis 로그 복1
+        // Redis 로그 복원
         String redisKey = "project:logs:" + uuid;
         List<String> bufferedLogs = redisTemplate.opsForList().range(redisKey, 0, -1);
         if (bufferedLogs != null) {
@@ -76,7 +77,6 @@ public class ProjectLogService {
                 String[] parts = raw.split("\\|\\|", 5);
                 if (parts.length < 4) continue;
 
-                // ISO 표준 시간을 포멧터로 지정
                 String timeStr = LocalDateTime.parse(parts[1], ISO_FORMATTER).format(TIME_FORMATTER);
                 logBuilder.append(String.format("[%s][%s] %s\n", parts[0], timeStr, parts[3]));
             }
@@ -84,7 +84,7 @@ public class ProjectLogService {
 
         return ProjectLogResponse.builder()
                 .uuid(project.getUuid())
-                .status(project.getStatus().name()) // "GENERATING" 같은 영어 이름
+                .status(project.getStatus().name())
                 .statusDescription(project.getStatus().getDescription())
                 .framework(project.getFramework())
                 .previousLogs(logBuilder.isEmpty() ? "[System] 아직 누적된 파이프라인 로그가 존재하지 않습니다." : logBuilder.toString())
@@ -96,45 +96,40 @@ public class ProjectLogService {
      */
     @Transactional
     public void saveWorkerLog(ProjectLogSaveRequest dto) {
-
         String uuid = dto.getUuid();
         String redisKey = "project:logs:" + uuid;
 
-        // 로그 발생 시점 서버 시간
         String createdAtStr = LocalDateTime.now().format(ISO_FORMATTER);
-
         ProjectStatus incomingStatus = parseStatus(dto.getStatus());
 
-        // Redis 버퍼 리스트에 실시간 적재 시 STATUS(incomingStatus)도 같이 4파트로 조립해서 저장!
-        String logLine = dto.getLogLevel() + "||" + createdAtStr + "||" + incomingStatus.name() + "||" + dto.getMessage() + "||" + dto.isActivityFeed();;
+        String logLine = dto.getLogLevel() + "||" + createdAtStr + "||" + incomingStatus.name() + "||" + dto.getMessage() + "||" + dto.isActivityFeed();
         redisTemplate.opsForList().rightPush(redisKey, logLine);
-
-        // 만료 시간을 24시간으로 설정
         redisTemplate.expire(redisKey, java.time.Duration.ofDays(1));
 
-        // 2. SSE 실시간 스트리밍
+        // SSE 실시간 스트리밍
         SseEmitter emitter = emitters.get(uuid);
-
         if (emitter != null) {
             try {
-                // 텍스트 로그 라인 전송
                 emitter.send(SseEmitter.event()
                         .name("log-stream")
                         .data(logLine));
             } catch (Exception e) {
                 emitters.remove(uuid);
+                // 인프라 통신 에러이므로 시스템 예외로 감싸서 분출
+                throw new IllegalStateException("실시간 파이프라인 로그 SSE 전송 중 인프라 오류가 발생했습니다.", e);
             }
         }
 
-        // COMPLETED 나 FAILED만 DB에 한번 저장
+        // COMPLETED 나 FAILED만 DB에 일괄 저장 및 백업
         if (incomingStatus == ProjectStatus.COMPLETED || incomingStatus == ProjectStatus.FAILED) {
             List<String> rawLogs = redisTemplate.opsForList().range(redisKey, 0, -1);
 
             if (rawLogs != null && !rawLogs.isEmpty()) {
+                // [버그 수정] 깨져있던 try-catch-finally 괄호 밸런스를 아키텍처 원칙에 맞춰 완전히 리폼했습니다.
                 try {
-                    Project project = projectRepository.findByUuid(uuid).orElseThrow();
+                    Project project = projectRepository.findByUuid(uuid)
+                            .orElseThrow(() -> new ProjectNotFoundException("로그를 백업할 프로젝트 장부를 찾을 수 없습니다. UUID: " + uuid));
 
-                    // 파싱한 로그를 JSONB용 Map 구조로 담기
                     List<Map<String, Object>> jsonbLogs = new ArrayList<>();
                     for (String raw : rawLogs) {
                         String[] parts = raw.split("\\|\\|", 5);
@@ -153,16 +148,16 @@ public class ProjectLogService {
                     project.getPipelineLogs().addAll(jsonbLogs);
                     project.updateStatus(incomingStatus);
 
-                    log.info("[DB] 최종 로그 일괄 덤프 완료. 루프를 성공적으로 마감합니다.");
-            } catch (Exception e) {
-                log.error("[🚨DB Error] 최종 로그를 DB에 백업하는 과정에서 실패했습니다.", e);
-            } finally {
-                // 예외 발생 여부와 무관하게 실행
-                clearRedisLogCache(uuid);
-            }
-        }
+                    log.info("[DB] 최종 파이프라인 로그 일괄 JSONB 덤프 성공 마감. UUID: {}", uuid);
 
-            //  공정 종결 시 종결된 복합 키를 타겟으로 에미터 종료 및 장부 삭제 진행
+                } catch (Exception e) {
+                    log.error("[DB Error] 최종 로그를 PostgreSQL JSONB에 백업하는 과정에서 심각한 시스템 장애 발생.", e);
+                    throw new IllegalStateException("로그 데이터베이스 마감 공정 중 인프라 합선 오류가 발생했습니다.", e);
+                } finally {
+                    clearRedisLogCache(uuid);
+                }
+            }
+
             if (emitter != null) {
                 emitter.complete();
             }
@@ -172,18 +167,20 @@ public class ProjectLogService {
 
     /**
      * 3. 리액트 전용 SSE 전화선 개설 창구
-     * 컨트롤러로부터 uuid와 유저 이메일을 받아 완벽한 소유권 검증 후 복합 키로 에미터를 등록합니다.
      */
     @Transactional(readOnly = true)
     public SseEmitter createSseConnection(String uuid, String loginEmail) {
-        User currentUser = userRepository.findByEmail(loginEmail).orElseThrow();
-        Project project = projectRepository.findByUuid(uuid).orElseThrow();
+        // 자바 공용 예외 컷 -> 커스텀 예외로 교체
+        User currentUser = userRepository.findByEmail(loginEmail)
+                .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다. email: " + loginEmail));
+
+        Project project = projectRepository.findByUuid(uuid)
+                .orElseThrow(() -> new ProjectNotFoundException("프로젝트를 찾을 수 없습니다. UUID: " + uuid));
 
         if (!project.getUser().getId().equals(currentUser.getId())) {
-            throw new SecurityException("권한이 없습니다.");
+            throw new AccessDeniedException("해당 실시간 로그 스트림에 접근할 권한이 없습니다.");
         }
 
-        // 복잡한 키 대신 직관적이고 빠른 uuid를 전화선 번호로 씁니다.
         SseEmitter emitter = new SseEmitter(-1L);
         emitters.put(uuid, emitter);
 
@@ -192,6 +189,7 @@ public class ProjectLogService {
 
         return emitter;
     }
+
     /**
      * 4. 프로젝트 삭제 전 외래키 제약조건을 원천 차단하기 위해 자식 로그들을 선제 삭제
      */
@@ -199,19 +197,18 @@ public class ProjectLogService {
     public void deleteLogsByProjectId(Long projectId) {
         log.info("[System] 프로젝트(ID: {}) 삭제 요청 감지. 연관된 모든 자식 로그 데이터를 먼저 제거합니다.", projectId);
 
+        // 커스텀 예외 교체
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 프로젝트입니다. ID: " + projectId));
+                .orElseThrow(() -> new ProjectNotFoundException("존재하지 않는 프로젝트입니다. ID: " + projectId));
 
         clearRedisLogCache(project.getUuid());
     }
 
-    // COMPLETEDE 오타 검증
     private ProjectStatus parseStatus(String status) {
         if (status == null) return ProjectStatus.CREATED;
 
         try {
-            // "COMPLETEDE" 오타 방어 및 대문자 변환
-            String s = status.toUpperCase().replace("COMPLETEDE", "COMPLETED");
+            String s = status.toUpperCase().replace("COMPLETED", "COMPLETED");
             return ProjectStatus.valueOf(s);
         } catch (Exception e) {
             log.warn("정의되지 않은 상태 값이 수신되었습니다. 기본값(CREATED)으로 처리합니다: {}", status);
@@ -229,5 +226,4 @@ public class ProjectLogService {
             log.debug("[Redis] 삭제하려는 키가 존재하지 않거나 이미 만료되었습니다. Key: {}", redisKey);
         }
     }
-
 }
