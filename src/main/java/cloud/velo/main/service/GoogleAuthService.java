@@ -32,7 +32,6 @@ public class GoogleAuthService {
     private String googleClientId;
 
     @Transactional
-    // 1. 무책임한 throws Exception 대신, 내부 라이브러리가 던지는 실제 예외 종류를 명시합니다.
     public User verifyTokenAndLogin(String credential) throws GeneralSecurityException, IOException {
 
         GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
