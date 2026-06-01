@@ -8,8 +8,8 @@ import cloud.velo.main.repository.AiModelRepository;
 import cloud.velo.main.repository.UserRepository;
 import cloud.velo.main.util.bucket.RateLimiter;
 import cloud.velo.main.exception.OverRateLimitException;
-import cloud.velo.main.exception.UserNotFoundException;  // 💡 추가
-import cloud.velo.main.exception.ModelNotFoundException; // 💡 추가
+import cloud.velo.main.exception.UserNotFoundException;
+import cloud.velo.main.exception.ModelNotFoundException;
 import io.github.bucket4j.Bucket;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

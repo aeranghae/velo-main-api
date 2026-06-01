@@ -2,7 +2,7 @@ package cloud.velo.main.service;
 
 import cloud.velo.main.dto.response.UserResponse;
 import cloud.velo.main.domain.User;
-import cloud.velo.main.exception.UserNotFoundException; // 💡 내가 만든 저격 예외 임포트!
+import cloud.velo.main.exception.UserNotFoundException;
 import cloud.velo.main.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

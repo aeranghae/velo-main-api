@@ -2,7 +2,7 @@ package cloud.velo.main.scheduler;
 
 import cloud.velo.main.client.SseEmitterManager;
 import cloud.velo.main.dto.response.ServerStatusResponse;
-import cloud.velo.main.service.ServerStatusService; // 💡 서비스 의존성 추가
+import cloud.velo.main.service.ServerStatusService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
