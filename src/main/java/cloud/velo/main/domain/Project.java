@@ -49,10 +49,8 @@ public class Project {
     private LocalDateTime createdAt;
     private LocalDateTime lastModifiedAt;
 
-    // 빈 폴더와 파일을 모두 담아낼 파일 색인 노드 장부
-    // PostgreSQL 환경에서 가볍고 안전하게 경로 리스트 변동을 관리할 수 있습니다.
-    @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(name = "project_file_nodes", joinColumns = @JoinColumn(name = "project_id"))
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Column(name = "file_nodes", columnDefinition = "jsonb")
     private List<ProjectNode> fileNodes = new ArrayList<>();
 
     @Builder

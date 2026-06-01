@@ -335,6 +335,8 @@ public class StorageService {
             @CacheEvict(value = "projectList", key = "#result.user.id", cacheManager = "cacheManager")
     })
     public Project indexProjectFiles(String projectUuid) {
+        // [주의] 만약 앞서 레포지토리에 fetch join을 걸어두었다면
+        // JSONB 전환 후에는 일반 findByUuid(projectUuid)만 호출해도 N+1 없이 초고속으로 긁어옵니다.
         Project project = projectRepository.findByUuid(projectUuid)
                 .orElseThrow(() -> new ProjectNotFoundException("해당 프로젝트 장부가 존재하지 않습니다: " + projectUuid));
 
@@ -386,6 +388,9 @@ public class StorageService {
                     .filter(path -> !Files.isDirectory(path))
                     .count();
 
+            // [성능 개션 구역]
+            // 여기서 updateStorageMeta가 실행될 때, 예전처럼 수백 번의 DELETE/INSERT 쿼리가 난사되지 않고
+            // 단 1번의 묵직한 단일 ROW 'UPDATE project SET file_nodes = ...' 쿼리만 나가며 마감됩니다.
             project.updateStorageMeta(totalSize, fileCount, nodes);
             return project;
 
@@ -393,6 +398,7 @@ public class StorageService {
             throw new IllegalStateException("프로젝트 자원 색인 마감 공정이 정상 실패했습니다.", e);
         }
     }
+
 
     @Cacheable(value = "projectTree", key = "#uuid", cacheManager = "cacheManager")
     @Transactional(readOnly = true)
@@ -403,6 +409,8 @@ public class StorageService {
         Project project = projectRepository.findByUuid(uuid)
                 .orElseThrow(() -> new ProjectNotFoundException("프로젝트 장부를 찾을 수 없습니다. UUID: " + uuid));
 
+        // [N+1 해결] 이제 project.getFileNodes()를 때려도 지연 로딩 서브 쿼리가 단 1줄도 나가지 않습니다!
+        // 이미 메인 쿼리 한 방으로 DB에서 이쁘게 정렬된 JSON 문자열을 가져와 파싱해 둔 상태이기 때문입니다.
         return project.getFileNodes().stream()
                 .map(ProjectNodeResponse::new)
                 .toList();

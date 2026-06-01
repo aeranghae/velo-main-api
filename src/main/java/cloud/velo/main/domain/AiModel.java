@@ -11,7 +11,6 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class AiModel {
 
     @Id
@@ -34,6 +33,16 @@ public class AiModel {
     private boolean isActive; // 현재 사용 가능한 모델인지 여부
 
     private boolean defaultActive; // 기본 모델 지정 여부
+
+    @Builder
+    public AiModel(String modelName, String provider, String apiKey, String endpoint, boolean isActive, boolean defaultActive) {
+        this.modelName = modelName;
+        this.provider = provider;
+        this.apiKey = apiKey;
+        this.endpoint = endpoint;
+        this.isActive = isActive;
+        this.defaultActive = defaultActive;
+    }
 
     // 업데이트 로직
     public void updateInfo(String apiKey, String endpoint, boolean isActive) {
