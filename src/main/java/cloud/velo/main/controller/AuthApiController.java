@@ -19,8 +19,7 @@ public class AuthApiController {
     private final AuthService authService;
 
     @PostMapping("/google")
-    public ResponseEntity<LoginResponse> googleLogin(@RequestBody GoogleLoginRequest request)
-            throws GeneralSecurityException, IOException {
+    public ResponseEntity<LoginResponse> googleLogin(@RequestBody GoogleLoginRequest request) {
 
         LoginResponse response = authService.loginWithGoogle(request.getCredential());
 
