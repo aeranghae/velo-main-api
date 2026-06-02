@@ -24,6 +24,9 @@ public class ProjectLogListener {
             logDto.setMessage(event.message());
             logDto.setStatus(event.status().name());
 
+            // 활동 피드 플래그 매핑
+            logDto.setActivityFeed(event.isActivityFeed());
+
             // Redis 적재 및 SSE 브로드캐스팅이 안전하게 실행
             projectLogService.saveWorkerLog(logDto);
         } catch (Exception e) {

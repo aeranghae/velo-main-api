@@ -181,9 +181,11 @@ public class ProjectLogService {
             throw new AccessDeniedException("해당 실시간 로그 스트림에 접근할 권한이 없습니다.");
         }
 
+        // 권한 검증 후 타임아웃은 무한대 기본 설정
         SseEmitter emitter = new SseEmitter(-1L);
-        emitters.put(uuid, emitter);
+        emitters.put(uuid, emitter); // 세션관리 : concurrentHashMap 구조로 emitter에 uuid 저장
 
+        // 클라이언트 측에서 타임아웃 발생시, 콜백 바인딩하여 메모리 누수 방지
         emitter.onCompletion(() -> emitters.remove(uuid));
         emitter.onTimeout(() -> emitters.remove(uuid));
 
@@ -201,7 +203,7 @@ public class ProjectLogService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ProjectNotFoundException("존재하지 않는 프로젝트입니다. ID: " + projectId));
 
-        clearRedisLogCache(project.getUuid());
+        clearRedisLogCache(project.getUuid()); // 프로젝트 제거시 남아있는 고아 redis 캐시 메모리 제거
     }
 
     private ProjectStatus parseStatus(String status) {
@@ -216,6 +218,7 @@ public class ProjectLogService {
         }
     }
 
+    // 남아있는 고아 redis 캐쉬 메모리 제거 메서드
     private void clearRedisLogCache(String uuid) {
         String redisKey = "project:logs:" + uuid;
         Boolean isDeleted = redisTemplate.delete(redisKey);
