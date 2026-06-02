@@ -197,8 +197,10 @@ public class LlmAgentClient extends TextWebSocketHandler {
             default -> observation = new AiModelMessage.Observation("OBSERVATION", "ERROR", 1, "", "지원하지 않는 도구입니다.");
         }
 
-        storageService.indexProjectFiles(this.uuid);
-
+        // (수정) 파일 시스템의 구조적 변경이 있을때만 인덱싱 수행
+        if ("WRITE_FILE".equals(action.getTool()) || "DELETE_FILE".equals(action.getTool())) {
+            storageService.indexProjectFiles(this.uuid);
+        }
         String jsonResponse = objectMapper.writeValueAsString(observation);
         session.sendMessage(new TextMessage(jsonResponse));
     }

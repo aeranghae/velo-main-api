@@ -24,6 +24,7 @@ public class ProjectLogController {
     @GetMapping("/{uuid}/status")
     public ResponseEntity<ProjectLogResponse> getProjectLogs(
             @PathVariable String uuid,
+            // 검증된 유저의 이메일만 서비스 레이어로 넘김
             @AuthenticationPrincipal String email) {
 
         ProjectLogResponse response = projectLogService.getProjectMetadataAndLogs(uuid, email);
@@ -44,6 +45,7 @@ public class ProjectLogController {
         // HTTP 스트리밍 표준 헤더 강제 주입 (실시간성 확보)
         return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_EVENT_STREAM)
+                // 버퍼 기능을 끄고, 들어오는 내용 즉시 클라이언트로 전송
                 .header("X-Accel-Buffering", "no") // Nginx 실시간 스트리밍 필수 옵션
                 .cacheControl(CacheControl.noCache())
                 .body(emitter);
