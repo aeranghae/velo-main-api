@@ -1,6 +1,5 @@
 package cloud.velo.main.config;
 
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,9 +18,7 @@ import java.time.Duration;
 public class RedisConfig {
 
     @Bean
-    public GenericJacksonJsonRedisSerializer jacksonRedisSerializer(
-            @Qualifier("redisObjectMapper") tools.jackson.databind.ObjectMapper redisObjectMapper) {
-
+    public GenericJacksonJsonRedisSerializer jacksonRedisSerializer() {
         return GenericJacksonJsonRedisSerializer.builder()
                 .enableDefaultTyping(
                         tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator.builder()
