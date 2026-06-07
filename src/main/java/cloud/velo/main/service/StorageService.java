@@ -153,6 +153,7 @@ public class StorageService {
     }
 
     @Transactional
+    @CacheEvict(value = "projectList", key = "#email", cacheManager = "cacheManager")
     public ProjectDeleteResponse deleteProjectAndGetResponse(String email, String uuid) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다. email: " + email));
@@ -161,6 +162,7 @@ public class StorageService {
     }
 
     @Transactional
+    @CacheEvict(value = "projectList", key = "#email", cacheManager = "cacheManager")
     public ProjectCleanResponse cleanAllProjectsByEmail(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다. email: " + email));
@@ -223,7 +225,6 @@ public class StorageService {
     }
 
     @Transactional
-    @CacheEvict(value = "projectList", key = "#user.email", cacheManager = "cacheManager")
     public List<String> deleteProject(User user, String uuid) {
         eventPublisher.publishEvent(new ProjectDeleteVerificationEvent(uuid));
 
@@ -242,7 +243,6 @@ public class StorageService {
     }
 
     @Transactional
-    @CacheEvict(value = "projectList", key = "#user.email", cacheManager = "cacheManager")
     public List<String> deleteAllProjects(User user) {
         List<Project> userProjects = projectRepository.findByUser(user);
 
