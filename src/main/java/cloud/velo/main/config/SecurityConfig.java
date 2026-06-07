@@ -2,7 +2,7 @@ package cloud.velo.main.config;
 
 import cloud.velo.main.filter.JwtAuthenticationFilter;
 import cloud.velo.main.security.JwtTokenProvider;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
