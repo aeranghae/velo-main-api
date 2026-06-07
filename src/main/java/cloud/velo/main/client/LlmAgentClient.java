@@ -4,6 +4,7 @@ import cloud.velo.main.dto.request.LlmAutomationInitRequest;
 import cloud.velo.main.dto.request.ProjectCreateRequest;
 import cloud.velo.main.dto.response.ProjectNodeResponse;
 import cloud.velo.main.dto.common.AiModelMessage;
+import cloud.velo.main.dto.response.UserProjectTreeResponse;
 import cloud.velo.main.event.ProjectLogEvent;
 import cloud.velo.main.service.DockerAgentService;
 import cloud.velo.main.service.StorageService;
@@ -245,8 +246,7 @@ public class LlmAgentClient extends TextWebSocketHandler {
                 language =  requestDto.getFrontend_language();
             }
         }
-
-        List<ProjectNodeResponse> fileNodes = storageService.getProjectTree(email, uuid);
+        UserProjectTreeResponse treeResponse = storageService.getProjectTree(email, uuid);
 
         // DTO로 구조 수정
         return LlmAutomationInitRequest.builder()
@@ -257,7 +257,7 @@ public class LlmAgentClient extends TextWebSocketHandler {
                 .database(requestDto.getDatabase())
                 .license(requestDto.getLicense())
                 .prompt(requestDto.getPrompt())
-                .tree(fileNodes)
+                .tree(treeResponse.getTree())
                 .build();
     }
 
