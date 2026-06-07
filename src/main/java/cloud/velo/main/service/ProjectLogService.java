@@ -113,10 +113,13 @@ public class ProjectLogService {
                 emitter.send(SseEmitter.event()
                         .name("log-stream")
                         .data(logLine));
+            } catch (java.io.IOException e) {
+              // 정상적인 이탈(Broken pipe)은 SSE 중단 알림
+              log.info("[SSE] 클라이언트 이탈 감지 (스트리밍 중단). UUID: {}", uuid);
+              emitters.remove(uuid);
             } catch (Exception e) {
-                emitters.remove(uuid);
-                // 인프라 통신 에러이므로 시스템 예외로 감싸서 분출
-                throw new IllegalStateException("실시간 파이프라인 로그 SSE 전송 중 인프라 오류가 발생했습니다.", e);
+              log.warn("[SSE] 실시간 스트리밍 중 통신 오류 발생. UUID: {}", uuid, e);
+              emitters.remove(uuid);
             }
         }
 
