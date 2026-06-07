@@ -9,6 +9,7 @@ import cloud.velo.main.service.DockerAgentService;
 import cloud.velo.main.service.StorageService;
 import jakarta.annotation.Nonnull;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -32,7 +33,9 @@ public class LlmAgentClient extends TextWebSocketHandler {
     private final String baseImage;
     private final ProjectCreateRequest requestDto;
 
-    private static final int MAX_TURN_LIMIT = 150;
+
+    @Value("${llm.server.max-count:300}")
+    private static final int MAX_TURN_LIMIT = 0;
     private int executionTurnCount = 0;
 
     private String registeredContainerId;
