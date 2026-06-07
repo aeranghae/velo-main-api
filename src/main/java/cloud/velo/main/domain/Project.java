@@ -77,15 +77,18 @@ public class Project {
     public void updateStorageMeta(long totalSize, int fileCount, List<ProjectNode> newNodes) {
         this.totalSize = totalSize;
         this.fileCount = fileCount;
-        this.lastModifiedAt = LocalDateTime.now(); // 파일 구조가 바뀌었으니 수정 시간도 갱신!
+        this.lastModifiedAt = LocalDateTime.now();
 
-        // 기존 값 타입 컬렉션 갱신
+        // 하이버네이트 추적 전용 컬렉션이 초기화되지 않았을 때의 방어선
         if (this.fileNodes == null) {
             this.fileNodes = new ArrayList<>();
         }
+
+        // 주소값 자체를 새로 대입하는 대신, 내부 원소만 갈아끼워 하이버네이트 영속성 세션을 유지합니다.
         this.fileNodes.clear();
         if (newNodes != null) {
-            this.fileNodes.addAll(newNodes);
+            // 리스트 내부 요소들을 순수 값 객체 배열로 안전하게 카피 인서트
+            this.fileNodes.addAll(new ArrayList<>(newNodes));
         }
     }
 
