@@ -220,6 +220,13 @@ public class LlmAgentClient extends TextWebSocketHandler {
             dockerAgentService.stopSandbox(this.registeredContainerId);
             this.registeredContainerId = null;
         }
+
+        try {
+            storageService.indexProjectFiles(this.email, this.uuid);
+        } catch (Exception e) {
+            log.error("[소켓-{}] 단절 후 캐시 장부 강제 리프레시 공정 실패", uuid, e);
+        }
+
         sendSystemLog("INFO", "안전 무결 격리 공간 반환 완료. 세션 마감.", this.finalProjectStatus, true);
     }
 
