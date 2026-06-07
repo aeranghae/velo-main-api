@@ -35,8 +35,7 @@ public class LlmAgentClient extends TextWebSocketHandler {
     private final ProjectCreateRequest requestDto;
 
 
-    @Value("${llm.server.max-count:300}")
-    private int maxTurnLimit;
+    private final int maxTurnLimit;
     private int executionTurnCount = 0;
 
     private String registeredContainerId;
@@ -45,7 +44,7 @@ public class LlmAgentClient extends TextWebSocketHandler {
 
     public LlmAgentClient(DockerAgentService dockerAgentService, ObjectMapper objectMapper, StorageService storageService,
                           String userId, String uuid, String email, String baseImage, ProjectCreateRequest requestDto,
-                          ApplicationEventPublisher eventPublisher) {
+                          ApplicationEventPublisher eventPublisher,int maxTurnLimit) {
         this.dockerAgentService = dockerAgentService;
         this.objectMapper = objectMapper;
         this.storageService = storageService;
@@ -55,6 +54,7 @@ public class LlmAgentClient extends TextWebSocketHandler {
         this.baseImage = baseImage;
         this.requestDto = requestDto;
         this.eventPublisher = eventPublisher;
+        this.maxTurnLimit = maxTurnLimit;
     }
 
     private void sendSystemLog(String logLevel, String message, ProjectStatus status, boolean isActivityFeed) {

@@ -35,6 +35,9 @@ public class AgentConnectionManager {
     @Value("${llm.server.ws:ws://localhost:8000}")
     private String serverUrl;
 
+    @Value("${llm.server.max-count:300}")
+    private int maxTurnLimit;
+
     private final Map<String, WebSocketConnectionManager> activeConnections = new ConcurrentHashMap<>();
 
     /**
@@ -61,7 +64,9 @@ public class AgentConnectionManager {
                 email,
                 baseImage,
                 requestDto,
-                eventPublisher);
+                eventPublisher,
+                maxTurnLimit
+        );
 
         String cleanedUrl = serverUrl.endsWith("/") ? serverUrl.substring(0, serverUrl.length() - 1) : serverUrl;
         String fastapiWsUrl = String.format("%s/agent?uuid=%s", cleanedUrl, uuid);
