@@ -182,7 +182,7 @@ public class StorageService {
     }
 
     @Transactional
-    @CacheEvict(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
+    @CacheEvict(value = "projectList", key = "#user.email", cacheManager = "cacheManager")
     public ProjectResponse createProject(User user, ProjectCreateRequest requestDto) {
         if ("FULL_STACK".equals(requestDto.getArchitecture_type())) {
             if (hasValue(requestDto.getFullstack_framework()) && !hasValue(requestDto.getBackend_framework()) && !hasValue(requestDto.getFrontend_framework())) {
@@ -201,7 +201,7 @@ public class StorageService {
     }
 
     @Transactional
-    @CacheEvict(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
+    @CacheEvict(value = "projectList", key = "#user.email", cacheManager = "cacheManager")
     public ProjectResponse updateProjectDescription(User user, String uuid, String description) {
         Project project = projectRepository.findByUuidAndUser(uuid, user)
                 .orElseThrow(() -> new ProjectNotFoundException("해당 프로젝트를 찾을 수 없거나 접근 권한이 없습니다. UUID: " + uuid));
@@ -211,7 +211,7 @@ public class StorageService {
     }
 
     @Transactional
-    @CacheEvict(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
+    @CacheEvict(value = "projectList", key = "#user.email", cacheManager = "cacheManager")
     public ProjectResponse updateProjectName(User user, String uuid, String newName) {
         Project project = projectRepository.findByUuid(uuid)
                 .filter(p -> p.getUser().getId().equals(user.getId()))
@@ -222,7 +222,7 @@ public class StorageService {
     }
 
     @Transactional
-    @CacheEvict(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
+    @CacheEvict(value = "projectList", key = "#user.email", cacheManager = "cacheManager")
     public List<String> deleteProject(User user, String uuid) {
         eventPublisher.publishEvent(new ProjectDeleteVerificationEvent(uuid));
 
@@ -241,7 +241,7 @@ public class StorageService {
     }
 
     @Transactional
-    @CacheEvict(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
+    @CacheEvict(value = "projectList", key = "#user.email", cacheManager = "cacheManager")
     public List<String> deleteAllProjects(User user) {
         List<Project> userProjects = projectRepository.findByUser(user);
 
@@ -332,7 +332,7 @@ public class StorageService {
     @Transactional
     @Caching(evict = {
             @CacheEvict(value = "projectTree", key = "#projectUuid", cacheManager = "cacheManager"),
-            @CacheEvict(value = "projectList", key = "#result.user.id", cacheManager = "cacheManager")
+            @CacheEvict(value = "projectList", key = "#result.user.email", cacheManager = "cacheManager")
     })
     public Project indexProjectFiles(String projectUuid) {
         // [주의] 만약 앞서 레포지토리에 fetch join을 걸어두었다면
@@ -465,7 +465,7 @@ public class StorageService {
         List<ProjectResponse> cachedProjects = null;
 
         if (cache != null) {
-            cachedProjects = cache.get(user.getId(), List.class);
+            cachedProjects = cache.get(user.getEmail(), List.class);
         }
 
         // 캐시 장부가 비어있다면, '진짜 프록시가 걸린 퍼블릭 메서드'를 호출하거나 레포지토리를 직접 조회합니다.
@@ -490,7 +490,7 @@ public class StorageService {
     }
 
     @Transactional(readOnly = true)
-    @CacheEvict(value = "projectList", key = "#user.id", cacheManager = "cacheManager")
+    @CacheEvict(value = "projectList", key = "#user.email", cacheManager = "cacheManager")
     public ProjectResponse updateUserProjectDetails(String uuid, User user) {
         Project project = projectRepository.findByUuidAndUser(uuid, user)
                 .orElseThrow(() -> new ProjectNotFoundException("해당 프로젝트를 찾을 수 없습니다. UUID: " + uuid));
