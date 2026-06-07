@@ -48,8 +48,9 @@ public class StorageApiController {
      */
     @GetMapping("/projects")
     public ResponseEntity<List<ProjectResponse>> getProjectList(@AuthenticationPrincipal String email) {
-        List<ProjectResponse> projects = storageService.getUserProjectDetailsByEmail(email);
-        return ResponseEntity.ok(projects);
+
+        UserProjectListResponse response = storageService.getUserProjectDetailsByEmail(email);
+        return ResponseEntity.ok(response.getProjects());
     }
 
     /**

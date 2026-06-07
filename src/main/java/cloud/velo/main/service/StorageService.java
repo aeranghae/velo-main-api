@@ -87,7 +87,7 @@ public class StorageService {
             throw new IllegalArgumentException("올바르지 않은 아키텍처 설정 구조입니다.");
         }
 
-        indexProjectFiles(newProject.getUuid());
+        indexProjectFiles(email, newProject.getUuid());
         return newProject;
     }
 
@@ -122,12 +122,13 @@ public class StorageService {
 
     @Cacheable(value = "projectList", key = "#email", cacheManager = "cacheManager")
     @Transactional(readOnly = true)
-    public List<ProjectResponse> getUserProjectDetailsByEmail(String email) {
+    public UserProjectListResponse getUserProjectDetailsByEmail(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다. email: " + email));
 
-        // 내부 호출을 하더라도 상위 관문에서 이미 캐시 장부를 체크했으므로 안전합니다.
-        return getUserProjectDetails(user);
+        // 내부 알맹이 로직(getUserProjectDetails)은 그대로 두고 상자에만 담아서 반환합니다.
+        List<ProjectResponse> details = getUserProjectDetails(user);
+        return new UserProjectListResponse(details);
     }
 
     @Transactional
@@ -332,9 +333,9 @@ public class StorageService {
     @Transactional
     @Caching(evict = {
             @CacheEvict(value = "projectTree", key = "#projectUuid", cacheManager = "cacheManager"),
-            @CacheEvict(value = "projectList", key = "#result.user.email", cacheManager = "cacheManager")
+            @CacheEvict(value = "projectList", key = "#email", cacheManager = "cacheManager")
     })
-    public Project indexProjectFiles(String projectUuid) {
+    public Project indexProjectFiles(String email, String projectUuid) {
         // [주의] 만약 앞서 레포지토리에 fetch join을 걸어두었다면
         // JSONB 전환 후에는 일반 findByUuid(projectUuid)만 호출해도 N+1 없이 초고속으로 긁어옵니다.
         Project project = projectRepository.findByUuid(projectUuid)
@@ -465,10 +466,13 @@ public class StorageService {
         List<ProjectResponse> cachedProjects = null;
 
         if (cache != null) {
-            cachedProjects = cache.get(user.getEmail(), List.class);
+            UserProjectListResponse wrapper = cache.get(user.getEmail(), UserProjectListResponse.class);
+            if (wrapper != null) {
+                cachedProjects = wrapper.getProjects();
+            }
         }
 
-        // 캐시 장부가 비어있다면, '진짜 프록시가 걸린 퍼블릭 메서드'를 호출하거나 레포지토리를 직접 조회합니다.
+        // 캐시 장부가 비어있다면 DB를 직접 긁어옵니다.
         if (cachedProjects == null) {
             List<Project> projects = projectRepository.findByUserOrderByLastModifiedAtDesc(user);
             cachedProjects = projects.stream().map(this::convertToDto).toList();

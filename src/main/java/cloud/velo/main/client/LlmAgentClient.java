@@ -202,7 +202,7 @@ public class LlmAgentClient extends TextWebSocketHandler {
 
         // (수정) 파일 시스템의 구조적 변경이 있을때만 인덱싱 수행
         if ("WRITE_FILE".equals(action.getTool()) || "DELETE_FILE".equals(action.getTool())) {
-            storageService.indexProjectFiles(this.uuid);
+            storageService.indexProjectFiles(email, this.uuid);
         }
         String jsonResponse = objectMapper.writeValueAsString(observation);
         session.sendMessage(new TextMessage(jsonResponse));
