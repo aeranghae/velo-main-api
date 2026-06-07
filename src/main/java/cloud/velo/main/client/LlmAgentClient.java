@@ -35,7 +35,7 @@ public class LlmAgentClient extends TextWebSocketHandler {
 
 
     @Value("${llm.server.max-count:300}")
-    private static final int MAX_TURN_LIMIT = 0;
+    private int maxTurnLimit;
     private int executionTurnCount = 0;
 
     private String registeredContainerId;
@@ -102,11 +102,11 @@ public class LlmAgentClient extends TextWebSocketHandler {
     @Override
     public void handleTextMessage(@Nonnull WebSocketSession session, @Nonnull TextMessage message) throws IOException { // @Nonnull 주입 및 throws 수정
         executionTurnCount++;
-        if (executionTurnCount > MAX_TURN_LIMIT) {
-            log.error("[소켓-{}] 최대 실행 턴 수({})를 초과하여 자동화 공정을 강제 종료합니다.", uuid, MAX_TURN_LIMIT);
+        if (executionTurnCount > maxTurnLimit) {
+            log.error("[소켓-{}] 최대 실행 턴 수({})를 초과하여 자동화 공정을 강제 종료합니다.", uuid, maxTurnLimit);
             this.finalProjectStatus = ProjectStatus.FAILED;
 
-            sendSystemLog("ERROR", "자율 공정 제한 횟수(" + MAX_TURN_LIMIT + "턴)를 초과하여 안전을 위해 시스템을 강제 종료합니다.", ProjectStatus.FAILED, true);
+            sendSystemLog("ERROR", "자율 공정 제한 횟수(" + maxTurnLimit + "턴)를 초과하여 안전을 위해 시스템을 강제 종료합니다.", ProjectStatus.FAILED, true);
 
             AiModelMessage.Observation errorObs = new AiModelMessage.Observation("OBSERVATION", "ERROR", 1, "", "MAX_TURN_LIMIT_EXCEEDED: 에이전트 루프가 너무 오래 지속되어 강제 종료되었습니다.");
             session.sendMessage(new TextMessage(objectMapper.writeValueAsString(errorObs)));
@@ -115,7 +115,7 @@ public class LlmAgentClient extends TextWebSocketHandler {
         }
 
         String payload = message.getPayload();
-        log.info("[소켓-{}] LLM 명령 수신 [Turn: {}/{}]", uuid, executionTurnCount, MAX_TURN_LIMIT);
+        log.info("[소켓-{}] LLM 명령 수신 [Turn: {}/{}]", uuid, executionTurnCount, maxTurnLimit);
 
         AiModelMessage.Action action = objectMapper.readValue(payload, AiModelMessage.Action.class);
         AiModelMessage.Observation observation;
