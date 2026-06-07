@@ -330,7 +330,10 @@ public class StorageService {
     }
 
     @Transactional
-    @CacheEvict(value = "projectTree", key = "#projectUuid", cacheManager = "cacheManager")
+    @Caching(evict = {
+            @CacheEvict(value = "projectTree", key = "#projectUuid", cacheManager = "cacheManager"),
+            @CacheEvict(value = "projectList", key = "#result.user.id", cacheManager = "cacheManager")
+    })
     public Project indexProjectFiles(String projectUuid) {
         // [주의] 만약 앞서 레포지토리에 fetch join을 걸어두었다면
         // JSONB 전환 후에는 일반 findByUuid(projectUuid)만 호출해도 N+1 없이 초고속으로 긁어옵니다.
