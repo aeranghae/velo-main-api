@@ -66,6 +66,9 @@ public class Project {
         this.lastModifiedAt = LocalDateTime.now();
         this.totalSize = 0L;
         this.fileCount = 0;
+
+        this.fileNodes = new ArrayList<>();
+        this.pipelineLogs = new ArrayList<>();
     }
 
     /**
@@ -77,8 +80,13 @@ public class Project {
         this.lastModifiedAt = LocalDateTime.now(); // 파일 구조가 바뀌었으니 수정 시간도 갱신!
 
         // 기존 값 타입 컬렉션 갱신
+        if (this.fileNodes == null) {
+            this.fileNodes = new ArrayList<>();
+        }
         this.fileNodes.clear();
-        this.fileNodes.addAll(newNodes);
+        if (newNodes != null) {
+            this.fileNodes.addAll(newNodes);
+        }
     }
 
     /**
@@ -105,11 +113,14 @@ public class Project {
      * 파일 스캔이 끝난 뒤 새로운 구조를 통째로 갈아 끼워주는 안전장치 메서드
      */
     public void updateFileNodes(List<ProjectNode> newNodes) {
+        if (this.fileNodes == null) {
+            this.fileNodes = new ArrayList<>();
+        }
         this.fileNodes.clear();
         if (newNodes != null) {
             this.fileNodes.addAll(newNodes);
         }
-        this.lastModifiedAt = LocalDateTime.now(); // 파일 구조 변경 시점도 수정 시간으로 갱신
+        this.lastModifiedAt = LocalDateTime.now();
     }
 
     /**
