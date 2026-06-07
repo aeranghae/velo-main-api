@@ -8,7 +8,6 @@ import lombok.NoArgsConstructor;
 
 import java.util.Objects;
 
-@Embeddable
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED) // JPA 엔티티/임베더블 규칙 보장
 @AllArgsConstructor
