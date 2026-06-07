@@ -401,20 +401,24 @@ public class StorageService {
     }
 
 
+    // cloud.velo.main.service.StorageService.java 내부
+
     @Cacheable(value = "projectTree", key = "#uuid", cacheManager = "cacheManager")
     @Transactional(readOnly = true)
-    public List<ProjectNodeResponse> getProjectTree(String email, String uuid) {
+    public UserProjectTreeResponse getProjectTree(String email, String uuid) {
         userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다. email: " + email));
 
         Project project = projectRepository.findByUuid(uuid)
                 .orElseThrow(() -> new ProjectNotFoundException("프로젝트 장부를 찾을 수 없습니다. UUID: " + uuid));
 
-        // [N+1 해결] 이제 project.getFileNodes()를 때려도 지연 로딩 서브 쿼리가 단 1줄도 나가지 않습니다!
-        // 이미 메인 쿼리 한 방으로 DB에서 이쁘게 정렬된 JSON 문자열을 가져와 파싱해 둔 상태이기 때문입니다.
-        return project.getFileNodes().stream()
+        // 기존의 노드 변환 스트림 연산 결과를 리스트로 수집
+        List<ProjectNodeResponse> treeList = project.getFileNodes().stream()
                 .map(ProjectNodeResponse::new)
                 .toList();
+
+        // 순수 리스트 대신 상자 객체로 감싸서 사출!
+        return new UserProjectTreeResponse(treeList);
     }
 
     public String getFileContent(String email, String uuid, String path) {

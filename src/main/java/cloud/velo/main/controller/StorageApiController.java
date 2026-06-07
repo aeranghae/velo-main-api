@@ -69,8 +69,11 @@ public class StorageApiController {
     @GetMapping("/projects/{uuid}/tree")
     public ResponseEntity<List<ProjectNodeResponse>> getProjectTree(@AuthenticationPrincipal String email,
                                                                     @PathVariable String uuid) {
-        List<ProjectNodeResponse> tree = storageService.getProjectTree(email, uuid);
-        return ResponseEntity.ok(tree);
+        // 서비스로부터 DTO 상자 수령
+        UserProjectTreeResponse response = storageService.getProjectTree(email, uuid);
+
+        // 내부의 순수 트리 리스트만 꺼내서 전송
+        return ResponseEntity.ok(response.getTree());
     }
 
     /**
