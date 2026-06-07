@@ -1,5 +1,6 @@
 package cloud.velo.main.config;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,9 +18,10 @@ import java.time.Duration;
 @EnableCaching
 public class RedisConfig {
 
-    // 두 빈이 동일한 serializer 설정을 공유하도록 분리
     @Bean
-    public GenericJacksonJsonRedisSerializer jacksonRedisSerializer() {
+    public GenericJacksonJsonRedisSerializer jacksonRedisSerializer(
+            @Qualifier("redisObjectMapper") tools.jackson.databind.ObjectMapper redisObjectMapper) {
+
         return GenericJacksonJsonRedisSerializer.builder()
                 .enableDefaultTyping(
                         tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator.builder()
@@ -37,12 +39,10 @@ public class RedisConfig {
 
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
-
         template.setKeySerializer(new StringRedisSerializer());
         template.setValueSerializer(serializer);
         template.setHashKeySerializer(new StringRedisSerializer());
         template.setHashValueSerializer(serializer);
-
         template.afterPropertiesSet();
         return template;
     }
@@ -57,7 +57,7 @@ public class RedisConfig {
                         .fromSerializer(new StringRedisSerializer()))
                 .serializeValuesWith(RedisSerializationContext.SerializationPair
                         .fromSerializer(serializer))
-                .entryTtl(Duration.ofMinutes(10)); //캐시 유지 시간
+                .entryTtl(Duration.ofMinutes(10));
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(config)
