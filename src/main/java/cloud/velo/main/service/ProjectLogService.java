@@ -118,7 +118,7 @@ public class ProjectLogService {
               log.info("[SSE] 클라이언트 이탈 감지 (스트리밍 중단). UUID: {}", uuid);
               emitters.remove(uuid);
             } catch (Exception e) {
-              log.warn("[SSE] 실시간 스트리밍 중 통신 오류 발생. UUID: {}", uuid, e);
+              log.warn("[SSE] 실시간 스트리밍 중 통신 오류 발생. UUID: {} | 원인: {}", uuid, e.getMessage());
               emitters.remove(uuid);
             }
         }
