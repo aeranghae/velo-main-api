@@ -6,6 +6,7 @@ import cloud.velo.main.dto.response.ProjectNodeResponse;
 import cloud.velo.main.dto.common.AiModelMessage;
 import cloud.velo.main.dto.response.UserProjectTreeResponse;
 import cloud.velo.main.event.ProjectLogEvent;
+import cloud.velo.main.exception.SandboxFileNotFoundException;
 import cloud.velo.main.service.DockerAgentService;
 import cloud.velo.main.service.StorageService;
 import jakarta.annotation.Nonnull;
@@ -164,16 +165,17 @@ public class LlmAgentClient extends TextWebSocketHandler {
                     String fileContent = dockerAgentService.readFile(this.userId, this.uuid, action.getPath());
                     observation = new AiModelMessage.Observation("OBSERVATION", "SUCCESS", 0, fileContent, "");
                     sendSystemLog("INFO", "[Success] 파일 조회가 완료되었습니다: " + action.getPath(), ProjectStatus.CODING, true);
-                } catch (IllegalArgumentException e) {
-                    // [수정] 파일이 없는 비즈니스적 예외는 스택 트레이스(e) 없이 메시지만 warn으로 기록
-                    log.warn("[소켓-{}] 파일 조회 실패 (존재하지 않음): {} | 메시지: {}", uuid, action.getPath(), e.getMessage());
+                } catch (SandboxFileNotFoundException e) {
+                    // [추가] 파일이 없을 때는 e를 로그 파라미터 맨 뒤에 던지지 않고 e.getMessage()만 warn 로그로 출력
+                    log.warn("[소켓-{}] 파일 조회 실패 (존재하지 않음): {} | {}", uuid, action.getPath(), e.getMessage());
+
                     observation = new AiModelMessage.Observation("OBSERVATION", "ERROR", 1, "", e.getMessage());
                     sendSystemLog("WARN", "[Fail] 파일 없음: " + action.getPath(), ProjectStatus.CODING, true);
                 } catch (Exception e) {
-                    // [유지] 그 외의 진짜 시스템 에러(디스크 깨짐, 도커 에러 등)는 추적을 위해 스택 트레이스(e) 포함 출력
+                    // 그 외 예상하지 못한 치명적인 에러(디스크 장애 등)만 스택 트레이스 출력
                     log.error("[소켓-{}] 파일 조회 중 치명적 시스템 예외 발생: {}", uuid, action.getPath(), e);
                     observation = new AiModelMessage.Observation("OBSERVATION", "ERROR", 1, "", "요청한 파일 자원을 읽을 수 없습니다.");
-                    sendSystemLog("ERROR", "[Fail] 파일 조회 시스템 오류: " + action.getPath() + " | Reason: " + e.getMessage(), ProjectStatus.CODING, true);
+                    sendSystemLog("ERROR", "[Fail] 파일 조회 실패: " + action.getPath() + " | Reason: " + e.getMessage(), ProjectStatus.CODING, true);
                 }
             }
             case "EXECUTE_CMD" -> {
