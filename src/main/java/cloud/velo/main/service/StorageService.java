@@ -231,7 +231,7 @@ public class StorageService {
                 .filter(p -> p.getUser().getId().equals(user.getId()))
                 .orElseThrow(() -> new ProjectNotFoundException("프로젝트를 찾을 수 없거나 권한이 없습니다. UUID: " + uuid));
 
-        projectLogService.deleteLogsByProjectId(project.getId());
+        // projectLogService.deleteLogsByProjectId(project.getId());
         projectRepository.delete(project);
 
         Path projectPath = Paths.get(baseStoragePath, String.valueOf(user.getId()), uuid);
