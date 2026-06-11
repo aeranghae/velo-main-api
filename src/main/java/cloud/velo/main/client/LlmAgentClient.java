@@ -164,10 +164,16 @@ public class LlmAgentClient extends TextWebSocketHandler {
                     String fileContent = dockerAgentService.readFile(this.userId, this.uuid, action.getPath());
                     observation = new AiModelMessage.Observation("OBSERVATION", "SUCCESS", 0, fileContent, "");
                     sendSystemLog("INFO", "[Success] 파일 조회가 완료되었습니다: " + action.getPath(), ProjectStatus.CODING, true);
+                } catch (IllegalArgumentException e) {
+                    // [수정] 파일이 없는 비즈니스적 예외는 스택 트레이스(e) 없이 메시지만 warn으로 기록
+                    log.warn("[소켓-{}] 파일 조회 실패 (존재하지 않음): {} | 메시지: {}", uuid, action.getPath(), e.getMessage());
+                    observation = new AiModelMessage.Observation("OBSERVATION", "ERROR", 1, "", e.getMessage());
+                    sendSystemLog("WARN", "[Fail] 파일 없음: " + action.getPath(), ProjectStatus.CODING, true);
                 } catch (Exception e) {
-                    log.error("[소켓-{}] 파일 조회 중 예외 발생: {}", uuid, action.getPath(), e);
+                    // [유지] 그 외의 진짜 시스템 에러(디스크 깨짐, 도커 에러 등)는 추적을 위해 스택 트레이스(e) 포함 출력
+                    log.error("[소켓-{}] 파일 조회 중 치명적 시스템 예외 발생: {}", uuid, action.getPath(), e);
                     observation = new AiModelMessage.Observation("OBSERVATION", "ERROR", 1, "", "요청한 파일 자원을 읽을 수 없습니다.");
-                    sendSystemLog("ERROR", "[Fail] 파일 조회 실패: " + action.getPath() + " | Reason: " + e.getMessage(), ProjectStatus.CODING, true);
+                    sendSystemLog("ERROR", "[Fail] 파일 조회 시스템 오류: " + action.getPath() + " | Reason: " + e.getMessage(), ProjectStatus.CODING, true);
                 }
             }
             case "EXECUTE_CMD" -> {
