@@ -34,9 +34,8 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -510,15 +509,38 @@ public class StorageService {
 
     private void deleteDirectoryRecursive(Path path) {
         if (Files.exists(path)) {
-            // [자원 누수 방지] try-with-resources 문을 도입하여 파일 디스크립터 유출을 철저히 차단합니다!
-            try (Stream<Path> walk = Files.walk(path)) {
-                walk.sorted(Comparator.reverseOrder())
-                        .map(Path::toFile)
-                        .forEach(file -> {
-                            if (!file.delete()) { // File.delete() 결과 무시 경고 진압
-                                log.warn("[NFS Warning] 파일 물리 삭제에 실패했습니다: {}", file.getAbsolutePath());
-                            }
-                        });
+            try {
+                // Files.walkFileTree는 내부적으로 자원(DirectoryStream)을 안전하게 닫아주어 누수가 없습니다.
+                //noinspection NullableProblems
+                Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
+
+                    // 1. 일반 파일 및 정상 링크 삭제
+                    @Override
+                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                        Files.delete(file);
+                        return FileVisitResult.CONTINUE;
+                    }
+                    // 2. 깨진 심볼릭 링크 등 파일 탐색 예외 발생 시 처리
+                    @Override
+                    public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+                        // 원본 파일이 없어서 속성을 조회하지 못하더라도, 링크 파일 자체를 강제로 삭제 시도합니다.
+                        try {
+                            Files.delete(file);
+                        } catch (IOException e) {
+                            log.warn("[NFS Warning] 물리적 깨진 자원 청소 실패: {} (원인: {})", file.toAbsolutePath(), e.getMessage());
+                        }
+                        return FileVisitResult.CONTINUE;
+                    }
+                    // 3. 자식 파일들이 다 지워진 빈 디렉토리 삭제 (역순 정렬 효과)
+                    @Override
+                    public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                        if (exc != null) {
+                            throw exc;
+                        }
+                        Files.delete(dir);
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
             } catch (IOException e) {
                 throw new IllegalStateException("물리적 자원 청소 마감 처리에 실패했습니다.", e);
             }
