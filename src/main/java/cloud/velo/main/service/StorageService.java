@@ -74,6 +74,7 @@ public class StorageService {
     // 컨트롤러 위임용 통합 비즈니스 메서드 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     @Transactional
+    @CacheEvict(value = "projectList", key = "#email", cacheManager = "cacheManager")
     public ProjectResponse createAndIndexProject(String email, ProjectCreateRequest requestDto) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("프로젝트를 생성할 사용자를 찾을 수 없습니다. email: " + email));
@@ -185,7 +186,6 @@ public class StorageService {
     }
 
     @Transactional
-    @CacheEvict(value = "projectList", key = "#user.email", cacheManager = "cacheManager")
     public ProjectResponse createProject(User user, ProjectCreateRequest requestDto) {
         if ("FULL_STACK".equals(requestDto.getArchitecture_type())) {
             if (hasValue(requestDto.getFullstack_framework()) && !hasValue(requestDto.getBackend_framework()) && !hasValue(requestDto.getFrontend_framework())) {
